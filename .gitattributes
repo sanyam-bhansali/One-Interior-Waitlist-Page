@@ -1,0 +1,12 @@
+# Normalise line endings: LF in the repo, native in the working copy.
+# Without this, Windows commits CRLF and a Mac clone shows every line as
+# changed. Silences the "LF will be replaced by CRLF" warnings too.
+* text=auto eol=lf
+
+# Binary — never touch these
+*.webp binary
+*.jpg  binary
+*.png  binary
+*.mp4  binary
+*.mp3  binary
+*.aac  binary
