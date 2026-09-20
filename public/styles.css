@@ -1,0 +1,533 @@
+/* ============================================================
+   One Interiors — Waitlist
+   A single committed dark world. No theme switching: the premise
+   is a dark room that lights up, so every colour is painted
+   explicitly and the page holds on any host background.
+   ============================================================ */
+
+:root{
+  /* ---- colour ---- */
+  --void:#07090a;
+  --bone:#f4f1e9;
+  --bone-2:rgba(244,241,233,.72);   /* secondary text */
+  --bone-3:rgba(244,241,233,.46);   /* tertiary / hints */
+  --brass:#c89b5c;
+  --brass-lit:#e3bd83;
+  --lamp:#f2c98a;
+  --alert:#e0895c;
+  --card-bg:rgba(22,20,17,.46);
+  --card-line:rgba(244,241,233,.13);
+  --ink-on-brass:#171006;
+
+  /* ---- type scale ----
+     A fourth-based scale. Every size on the page comes from here;
+     nothing is hardcoded in a rule. */
+  --fs-display:clamp(30px, 5.4vw, 54px);
+  --fs-title:clamp(22px, 2.4vw, 26px);
+  --fs-lead:15px;
+  --fs-body:14.5px;
+  --fs-small:13px;
+  --fs-micro:12px;
+  --fs-label:10px;
+  --fs-cta:21px;        /* the hero button, its own step */
+
+  /* ---- tracking ----
+     Three roles, three values. Uppercase mono needs air; the
+     display serif needs the opposite. */
+  --tr-brand:.30em;     /* the wordmark, widest */
+  --tr-label:.17em;     /* eyebrows, section labels */
+  --tr-hint:.20em;      /* quiet all-caps asides */
+  --tr-display:-.022em; /* large serif tightens optically */
+  --tr-title:-.012em;
+
+  /* ---- rhythm ---- */
+  --lh-display:1.08;
+  --lh-title:1.18;
+  --lh-body:1.55;
+  --lh-tight:1.4;
+
+  --ease-cine:cubic-bezier(.22,1,.36,1);
+  --ease-rise:cubic-bezier(.16,.84,.28,1);
+
+  --card-w:392px;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--void);
+  color:var(--bone);
+  overflow:hidden;
+  font-family:'Jost',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+button{font:inherit;color:inherit}
+:focus-visible{outline:1.5px solid var(--brass-lit); outline-offset:3px; border-radius:3px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---- type roles ---------------------------------------------
+   Fraunces carries optical-size, SOFT and WONK axes. Left at its
+   defaults it reads clumsy; at high opsz with SOFT and WONK at 0
+   it sharpens into a proper high-contrast display face. That one
+   line is most of the difference between "a serif" and "classy".
+   ------------------------------------------------------------- */
+.t-display,.t-title{
+  font-family:'Fraunces',Georgia,'Times New Roman',serif;
+  font-variation-settings:'SOFT' 0,'WONK' 0,'opsz' 144;
+  font-weight:300;
+}
+.t-display{font-size:var(--fs-display); line-height:var(--lh-display);
+  letter-spacing:var(--tr-display); text-wrap:balance}
+.t-title{font-size:var(--fs-title); line-height:var(--lh-title);
+  letter-spacing:var(--tr-title); font-weight:400;
+  font-variation-settings:'SOFT' 0,'WONK' 0,'opsz' 72}
+.t-mono{
+  font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,monospace;
+  font-size:var(--fs-label); text-transform:uppercase;
+  letter-spacing:var(--tr-label); font-weight:400; line-height:1;
+}
+
+/* ============================================================
+   STAGE + LIGHTING TOKENS
+   Every surface reads its fill from a variable; stages redefine
+   the variables, so one transition rule drives the whole room.
+   ============================================================ */
+#stage{
+  position:fixed; inset:0; overflow:hidden;
+  --wall:#0b0e10; --wallL:#090c0d; --ceil:#080b0c; --back:#0a0d0f; --floor:#070909;
+  --glow:0; --mat:0; --day:0; --amb:0;
+}
+#stage[data-stage="1"]{
+  --wall:#171715; --wallL:#131312; --ceil:#141310; --back:#141413; --floor:#0e0d0b;
+  --glow:.24; --mat:.12; --amb:.10;
+}
+#stage[data-stage="2"]{
+  --wall:#39332a; --wallL:#2c2721; --ceil:#2b271f; --back:#322d25; --floor:#241c12;
+  --glow:.55; --mat:.6; --day:.35; --amb:.3;
+}
+#stage[data-stage="3"],#stage[data-stage="4"],#stage[data-stage="5"]{
+  --wall:#5a4f3a; --wallL:#473e2d; --ceil:#42392a; --back:#514631; --floor:#3a2a17;
+  --glow:.85; --mat:1; --day:.8; --amb:.5;
+}
+#stage[data-stage="5"]{ --glow:1; --day:1; --amb:.62; }
+
+#stage.sty-modern:is([data-stage="3"],[data-stage="4"],[data-stage="5"]){
+  --wall:#3d443a; --wallL:#2f352c; --ceil:#333a30; --back:#394035; --floor:#2a2116; }
+#stage.sty-industrial:is([data-stage="3"],[data-stage="4"],[data-stage="5"]){
+  --wall:#3a3734; --wallL:#2c2a27; --ceil:#2f2c29; --back:#35322f; --floor:#221d18; }
+#stage.sty-traditional:is([data-stage="3"],[data-stage="4"],[data-stage="5"]){
+  --wall:#61402c; --wallL:#4d3222; --ceil:#4a3121; --back:#5a3b28; --floor:#41230f; }
+
+/* ============================================================
+   RENDER BACKGROUND ADJUSTMENTS
+   A photographic render reaches ~155 luminance behind the card
+   once the lights are up. The card was tuned for a near-black
+   vector room, so it deepens when a render is driving the page.
+   ============================================================ */
+#stage.render-bg{
+  --card-bg:rgba(15,13,11,.66);
+  --card-line:rgba(244,241,233,.19);
+  --bone-2:rgba(244,241,233,.82);
+  --bone-3:rgba(244,241,233,.62);
+}
+#stage.render-bg .card{
+  box-shadow:0 40px 96px -24px rgba(0,0,0,.92), inset 0 1px 0 rgba(255,255,255,.08);
+}
+#stage.render-bg .finale::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 64% 56% at 50% 50%,
+    rgba(7,6,5,.88) 0%, rgba(7,6,5,.64) 44%, rgba(7,6,5,0) 82%);
+}
+#stage.render-bg .finale > *{position:relative}
+/* the unlit frame has lighter corners than the vector room, so the
+   whisper-level hint needs a touch more presence to stay legible */
+#stage.render-bg .opening .hint{color:rgba(244,241,233,.56)}
+
+/* ============================================================
+   SEQUENCE + MEDIA LAYERS
+   ============================================================ */
+.seq{position:absolute; inset:0; width:100%; height:100%; display:block}
+.seq[hidden]{display:none}
+
+.media{position:absolute; inset:0}
+.media[hidden]{display:none}
+.media img{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; object-position:center;
+  opacity:0; transition:opacity 1.1s var(--ease-cine);
+}
+.media img.on{opacity:1}
+
+/* A scrubbed sequence has camera movement baked in; the still and
+   vector rooms get it here so nothing ever sits perfectly static. */
+@keyframes drift{
+  0%   {transform:scale(1.14) translate3d(1.2%,.8%,0)}
+  100% {transform:scale(1) translate3d(0,0,0)}
+}
+.drift{animation:drift 70s cubic-bezier(.33,0,.25,1) forwards}
+
+/* ============================================================
+   VECTOR ROOM (fallback)
+   ============================================================ */
+.roomwrap{position:absolute; inset:0}
+#room{width:100%; height:100%; display:block}
+
+.surf{transition:fill .9s var(--ease-cine)}
+.wall{fill:var(--wall)} .wallL{fill:var(--wallL)} .ceil{fill:var(--ceil)}
+.back{fill:var(--back)} .floorS{fill:var(--floor)}
+
+.lit{transition:opacity .9s var(--ease-cine)}
+.emit{opacity:var(--glow)} .matx{opacity:var(--mat)}
+.dayx{opacity:var(--day)} .ambx{opacity:var(--amb)}
+
+.furn{opacity:0; transform:translateY(14px); transform-origin:center bottom;
+  transition:opacity 1.1s ease, transform 1.1s var(--ease-rise)}
+#stage:is([data-stage="4"],[data-stage="5"]) .furn{opacity:1; transform:translateY(0)}
+#stage[data-stage="4"] .d1{transition-delay:.10s}
+#stage[data-stage="4"] .d2{transition-delay:.34s}
+#stage[data-stage="4"] .d3{transition-delay:.56s}
+#stage[data-stage="4"] .d4{transition-delay:.78s}
+#stage[data-stage="4"] .d5{transition-delay:1s}
+#stage[data-stage="4"] .d6{transition-delay:1.2s}
+
+@keyframes strike{
+  0%{opacity:0} 6%{opacity:.9} 10%{opacity:.05} 16%{opacity:.7}
+  20%{opacity:.1} 30%{opacity:1} 40%{opacity:.45} 100%{opacity:1}
+}
+#stage.striking .strikegrp{animation:strike .95s ease-out both}
+
+.grain{position:absolute; inset:-40%; pointer-events:none; opacity:.16; mix-blend-mode:overlay}
+.vig{position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 78% 68% at 50% 46%, transparent 40%, rgba(0,0,0,.72) 100%)}
+
+.torch{
+  position:absolute; width:52vmax; height:52vmax; left:0; top:0;
+  margin:-26vmax 0 0 -26vmax; pointer-events:none; mix-blend-mode:screen; border-radius:50%;
+  background:radial-gradient(circle, rgba(200,155,92,.13), rgba(200,155,92,.04) 36%, transparent 68%);
+  opacity:0; transition:opacity 1.2s ease;
+}
+#stage[data-stage="0"] .torch{opacity:1}
+
+/* ============================================================
+   DUST
+   The particle canvas sits above every layer so motes drift over
+   the card and the closing message. .fx-dissolving erodes the
+   element itself with a swept mask, in step with the particles
+   leaving it — the two together read as disintegration rather
+   than a fade. Opacity rides along so that if a browser drops
+   the mask, the element still leaves cleanly.
+   ============================================================ */
+#fx{
+  position:fixed; inset:0; width:100%; height:100%;
+  pointer-events:none; z-index:20;
+}
+.fx-dissolving{
+  --diss:0;
+  -webkit-mask-image:linear-gradient(100deg,
+    transparent calc(var(--diss) * 132% - 32%), #000 calc(var(--diss) * 132%));
+  mask-image:linear-gradient(100deg,
+    transparent calc(var(--diss) * 132% - 32%), #000 calc(var(--diss) * 132%));
+  -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+}
+
+/* ============================================================
+   OPENING
+   ============================================================ */
+.opening{
+  position:absolute; inset:0; z-index:6; padding:0 24px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  transition:opacity .6s ease;
+}
+.opening.gone{opacity:0; pointer-events:none}
+
+.brandmark{display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:34px}
+.brandmark img{height:38px; width:auto; opacity:.94}
+.brandmark .wordmark{color:var(--bone-2)}
+.brandmark .wordmark.t-mono{letter-spacing:var(--tr-brand)}
+
+.joinbtn{
+  position:relative; background:transparent;
+  border:1px solid rgba(244,241,233,.26); border-radius:999px;
+  padding:19px 54px; cursor:pointer;
+  font-family:'Fraunces',Georgia,serif;
+  font-variation-settings:'SOFT' 0,'WONK' 0,'opsz' 72;
+  font-weight:300; font-size:var(--fs-cta); letter-spacing:.03em; line-height:1;
+  transition:border-color .55s ease, letter-spacing .55s var(--ease-cine),
+             background .55s ease, color .55s ease;
+}
+.joinbtn::after{
+  content:""; position:absolute; inset:-1px; border-radius:999px;
+  border:1px solid var(--brass); opacity:0;
+  animation:breathe 4.4s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:0; transform:scale(1)} 50%{opacity:.32; transform:scale(1.065)}}
+.joinbtn:hover{
+  border-color:rgba(200,155,92,.72); background:rgba(200,155,92,.07);
+  letter-spacing:.07em; color:var(--brass-lit);
+}
+
+.perk{
+  display:flex; align-items:center; gap:10px; margin:32px 0 0;
+  padding:10px 18px; border:1px solid rgba(200,155,92,.22); border-radius:999px;
+  background:rgba(200,155,92,.05);
+  font-size:var(--fs-micro); line-height:var(--lh-tight); color:var(--bone-2);
+  max-width:min(440px,100%);
+}
+.dot{width:5px; height:5px; border-radius:50%; background:var(--brass);
+  flex:none; box-shadow:0 0 9px var(--brass)}
+.opening .hint{
+  margin-top:46px; color:var(--bone-3);
+  letter-spacing:var(--tr-hint); font-size:var(--fs-label);
+}
+
+/* ============================================================
+   GLASS CARD
+   ============================================================ */
+.cardwrap{
+  position:absolute; inset:0; z-index:7; padding:24px; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+}
+.card{
+  pointer-events:auto; width:min(var(--card-w),100%);
+  background:var(--card-bg); border:1px solid var(--card-line); border-radius:20px;
+  backdrop-filter:blur(26px) saturate(150%); -webkit-backdrop-filter:blur(26px) saturate(150%);
+  padding:32px 30px 28px;
+  box-shadow:0 40px 90px -28px rgba(0,0,0,.82), inset 0 1px 0 rgba(255,255,255,.07);
+  opacity:0; transform:translateY(40px) scale(.985); visibility:hidden;
+  transition:opacity .9s ease, transform 1s var(--ease-rise), visibility 0s linear .9s;
+}
+.card.up{opacity:1; transform:none; visibility:visible; transition-delay:0s}
+
+.prog{display:flex; gap:5px; margin-bottom:22px}
+.prog i{height:2px; flex:1; background:rgba(244,241,233,.13); border-radius:2px;
+  transition:background .5s ease}
+.prog i.on{background:var(--brass)}
+
+.eyebrow{color:var(--brass); margin-bottom:12px}
+.card h2{margin:0 0 8px}
+.card .sub{font-size:var(--fs-small); color:var(--bone-2); margin:0 0 22px;
+  line-height:var(--lh-tight)}
+
+.field{margin-bottom:16px}
+.field label{display:block; color:var(--bone-3); margin-bottom:8px}
+.field input{
+  width:100%; background:rgba(0,0,0,.26); border:1px solid rgba(244,241,233,.15);
+  border-radius:11px; padding:14px 15px; font-size:var(--fs-body); color:var(--bone);
+  font-family:inherit; font-weight:400; outline:none;
+  transition:border-color .3s ease, background .3s ease;
+}
+.field input::placeholder{color:rgba(244,241,233,.28)}
+.field input:focus{border-color:var(--brass); background:rgba(0,0,0,.36)}
+.field input[aria-invalid="true"]{border-color:var(--alert)}
+.err{display:block; font-size:var(--fs-micro); color:var(--alert);
+  margin-top:8px; line-height:var(--lh-tight)}
+.err:empty{margin-top:0}
+
+.styles{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:20px}
+.chip{
+  border:1px solid rgba(244,241,233,.15); border-radius:11px; padding:14px 8px;
+  text-align:center; font-size:var(--fs-micro); cursor:pointer; color:var(--bone-2);
+  background:rgba(0,0,0,.2); line-height:1.3;
+  transition:border-color .3s ease, background .3s ease, color .3s ease;
+}
+.chip:hover{border-color:rgba(200,155,92,.5); color:var(--bone)}
+.chip[aria-pressed="true"]{border-color:var(--brass); background:rgba(200,155,92,.15);
+  color:var(--bone); font-weight:500}
+
+.cta{
+  width:100%; background:var(--brass); color:var(--ink-on-brass); border:none;
+  border-radius:11px; padding:15px; font-size:var(--fs-body); font-weight:500;
+  letter-spacing:.01em; cursor:pointer; font-family:inherit;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  transition:filter .25s ease, opacity .25s ease;
+}
+.cta:hover:not(:disabled){filter:brightness(1.08)}
+.cta:disabled{opacity:.32; cursor:not-allowed}
+.cta.busy{opacity:.78; cursor:wait}
+.spin{
+  width:14px; height:14px; border:2px solid rgba(23,16,6,.28);
+  border-top-color:var(--ink-on-brass); border-radius:50%;
+  animation:spin .7s linear infinite; display:none;
+}
+.cta.busy .spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.cardperk{
+  display:flex; gap:10px; align-items:flex-start; margin:18px 0 0; padding-top:17px;
+  border-top:1px solid rgba(244,241,233,.09);
+  font-size:var(--fs-micro); line-height:var(--lh-tight); color:var(--bone-2);
+}
+.cardperk .dot{margin-top:5px}
+.cardperk b{color:var(--bone); font-weight:500}
+
+.step[hidden]{display:none}
+.step{animation:stepin .6s var(--ease-rise)}
+@keyframes stepin{from{opacity:0; transform:translateY(9px)} to{opacity:1; transform:none}}
+
+.formerr{
+  margin-top:14px; padding:12px 14px; border-radius:10px;
+  background:rgba(224,137,92,.11); border:1px solid rgba(224,137,92,.32);
+  font-size:var(--fs-micro); line-height:var(--lh-tight); color:#f3c6a9;
+}
+.formerr[hidden]{display:none}
+.hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+
+/* ============================================================
+   FINALE
+   ============================================================ */
+.finale{
+  position:absolute; inset:0; z-index:8; padding:0 28px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; opacity:0; pointer-events:none; visibility:hidden;
+}
+.finale.shown{opacity:1; pointer-events:auto; visibility:visible}
+.finale .flogo{height:30px; width:auto; margin-bottom:22px; opacity:.9}
+.finale .fmark{color:var(--brass); margin-bottom:26px; letter-spacing:var(--tr-hint)}
+.finale h1{margin:0 0 16px; max-width:17ch}
+.finale .flead{font-size:var(--fs-lead); color:var(--bone-2); max-width:34ch;
+  margin:0 0 32px; line-height:var(--lh-tight)}
+.fperk{
+  display:flex; align-items:center; gap:11px; padding:13px 21px;
+  border:1px solid rgba(200,155,92,.28); border-radius:999px;
+  background:rgba(200,155,92,.06); font-size:var(--fs-micro); color:var(--bone-2);
+  max-width:min(440px,100%); text-align:left; line-height:var(--lh-tight);
+}
+.fperk b{color:var(--bone); font-weight:500}
+
+.ghost{
+  margin-top:28px; background:transparent; border:1px solid rgba(244,241,233,.22);
+  border-radius:999px; padding:13px 28px; font-size:var(--fs-small); cursor:pointer;
+  color:var(--bone); font-family:inherit; letter-spacing:.01em;
+  transition:border-color .35s ease, background .35s ease, color .35s ease;
+}
+.ghost:hover{border-color:rgba(200,155,92,.62); background:rgba(200,155,92,.07);
+  color:var(--brass-lit)}
+.ghost[hidden]{display:none}
+
+.share{margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:13px}
+.share .label{color:var(--bone-3); letter-spacing:var(--tr-hint)}
+.share[hidden]{display:none}
+
+/* ============================================================
+   DEMO PANEL
+   ============================================================ */
+.demo{
+  position:absolute; inset:0; z-index:9; padding:28px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+  opacity:0; pointer-events:none; visibility:hidden;
+}
+.demo.shown{opacity:1; pointer-events:auto; visibility:visible}
+.demo::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:rgba(6,5,4,.74); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+.demo > *{position:relative}
+.demo-frame{
+  width:min(920px,100%); border-radius:16px; overflow:hidden;
+  border:1px solid rgba(244,241,233,.16);
+  box-shadow:0 50px 120px -30px rgba(0,0,0,.9);
+  background:#000; line-height:0;
+}
+.demo-frame video{width:100%; height:auto; display:block; max-height:72vh}
+.demo .cap{color:var(--bone-3); letter-spacing:var(--tr-hint); text-align:center}
+.demo[hidden]{display:none}
+
+/* ============================================================
+   RESPONSIVE
+   Three real cases: narrow phones, short viewports, and landscape
+   phones — where a centred full-height layout otherwise collides
+   with itself.
+   ============================================================ */
+@media (max-width:540px){
+  :root{ --card-w:100%; --fs-lead:14.5px; --fs-cta:19px; }
+  .card{padding:26px 22px 22px}
+  .joinbtn{padding:17px 42px}
+  .perk{margin-top:26px; padding:10px 15px}
+  .opening .hint{margin-top:34px}
+  .finale .flead{margin-bottom:26px}
+  .fperk{padding:12px 17px}
+}
+
+@media (max-height:680px){
+  .opening .hint{display:none}
+  .brandmark{margin-bottom:26px}
+  .perk{margin-top:24px}
+  .finale .fmark{margin-bottom:18px}
+  .finale .flead{margin-bottom:24px}
+}
+
+/* Landscape phone: vertical space is the scarce resource. Let the
+   card scroll inside itself rather than pushing off-screen. */
+@media (max-height:560px) and (orientation:landscape){
+  :root{ --fs-display:clamp(22px,4vw,30px); --card-w:420px; }
+  .cardwrap{padding:14px}
+  .card{padding:20px 22px 18px; max-height:calc(100dvh - 28px); overflow-y:auto}
+  .prog{margin-bottom:14px}
+  .card .sub{margin-bottom:14px}
+  .field{margin-bottom:11px}
+  .styles{margin-bottom:13px}
+  .cardperk{margin-top:13px; padding-top:12px}
+  .brandmark{margin-bottom:18px}
+  .brandmark img{height:30px}
+  .opening .hint,.share{display:none}
+  .perk{margin-top:18px}
+  .finale .flogo{display:none}
+  .finale .fmark{margin-bottom:12px}
+  .finale .flead{margin-bottom:18px}
+  .ghost{margin-top:16px}
+  .demo-frame video{max-height:78vh}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .surf,.lit,.furn,.card,.opening,.finale,.demo,.torch,.media img{
+    transition-duration:.2s !important; transition-delay:0s !important;
+  }
+  #stage.striking .strikegrp{animation:none}
+  .drift{animation:none}
+  .joinbtn::after{animation:none; opacity:.22}
+  .step{animation:none}
+  .spin{animation-duration:1.4s}
+  #fx{display:none}
+}
+
+
+/* ── For interior studios ─────────────────────────────────────
+   The only link that leaves this page, and it is deliberately the
+   quietest thing on it: a homeowner should never be pulled toward
+   a trade application, and a studio owner who came looking for it
+   will find it in the corner where a nav would be.
+
+   Above the vignette (z-index 20) so it survives every stage, and
+   pointer-events are re-enabled only on the link itself — the
+   canvas beneath it is tracking the cursor to light the room. */
+.forstudios{
+  position:fixed; top:20px; right:22px; z-index:30;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 14px; border-radius:999px;
+  border:1px solid var(--card-line);
+  background:var(--card-bg);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  color:var(--bone-2); text-decoration:none;
+  font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+  pointer-events:auto;
+  transition:color .22s ease, border-color .22s ease, background .22s ease;
+}
+.forstudios:hover,
+.forstudios:focus-visible{
+  color:var(--bone); border-color:rgba(244,241,233,.3);
+}
+.forstudios:focus-visible{ outline:2px solid var(--brass); outline-offset:3px; }
+
+/* On a phone the corner is where the thumb rests and the room is
+   the point. Smaller, and the arrow carries it. */
+@media (max-width:560px){
+  .forstudios{ top:14px; right:14px; padding:8px 11px; font-size:10.5px; letter-spacing:.1em; }
+  .forstudios span:first-child{ display:none; }
+  .forstudios::before{ content:"Studios"; }
+}

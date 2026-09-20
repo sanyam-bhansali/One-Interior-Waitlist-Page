@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>One Interiors — Join the Pune waitlist</title>
+<meta name="description" content="A curated marketplace of verified interior designers, launching first in Pune. Join the waitlist and get a free consultation with a certified architect.">
+<meta name="theme-color" content="#07090a">
+
+<!-- Link previews (WhatsApp, Instagram DMs, LinkedIn) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="One Interiors — Join the Pune waitlist">
+<meta property="og:description" content="Verified designers, an instant quote, and a free consultation with a certified architect. Launching first in Pune.">
+<meta property="og:image" content="assets/og-room.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307090a'/%3E%3Crect x='6' y='9' width='8' height='4' rx='1' fill='%23f2c98a'/%3E%3Crect x='18' y='9' width='8' height='4' rx='1' fill='%23f2c98a'/%3E%3Cpath d='M4 26h24' stroke='%23c89b5c' stroke-width='2'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:SOFT,WONK,opsz,wght@0..100,0..1,9..144,300..600&family=Jost:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- The one way off this page.
+     Outside #stage on purpose: the stages fade in and out as the
+     room lights, and a studio owner arriving mid-sequence should
+     not have to wait for an animation to find the door. Hidden
+     until config.js supplies a URL. -->
+<a class="forstudios t-mono" id="forStudios" href="#" hidden>
+  <span>For interior studios</span>
+  <span aria-hidden="true">&rarr;</span>
+</a>
+
+<div id="stage" data-stage="0">
+
+  <canvas id="fx" aria-hidden="true"></canvas>
+
+  <!-- ===== Scrubbed frame sequence, when config.js supplies one ===== -->
+  <canvas class="seq" id="seq" hidden aria-hidden="true"></canvas>
+
+  <!-- ===== Real renders, when config.js supplies them ===== -->
+  <div class="media" id="media" hidden>
+    <img alt="" data-s="0"><img alt="" data-s="1"><img alt="" data-s="2">
+    <img alt="" data-s="3"><img alt="" data-s="4"><img alt="" data-s="5">
+  </div>
+
+  <!-- ===== Vector room: fallback, and what you see until renders land ===== -->
+  <div class="roomwrap" id="vecroom">
+    <svg id="room" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f2c98a" stop-opacity=".5"/>
+          <stop offset="45%" stop-color="#f2c98a" stop-opacity=".14"/>
+          <stop offset="100%" stop-color="#f2c98a" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="pool">
+          <stop offset="0%" stop-color="#ffdca8" stop-opacity=".55"/>
+          <stop offset="55%" stop-color="#e8b878" stop-opacity=".16"/>
+          <stop offset="100%" stop-color="#e8b878" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="pool2">
+          <stop offset="0%" stop-color="#ffdca8" stop-opacity=".5"/>
+          <stop offset="100%" stop-color="#e8b878" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffd9a0" stop-opacity=".22"/>
+          <stop offset="60%" stop-color="#ffd9a0" stop-opacity=".03"/>
+          <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="day" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#dfeaf2" stop-opacity=".82"/>
+          <stop offset="100%" stop-color="#cfe0ea" stop-opacity=".22"/>
+        </linearGradient>
+        <linearGradient id="daybeam" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e8f1f6" stop-opacity=".3"/>
+          <stop offset="100%" stop-color="#e8f1f6" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="sofaG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#4a6450"/><stop offset="100%" stop-color="#25392c"/>
+        </linearGradient>
+        <linearGradient id="chairG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#7d6a4e"/><stop offset="100%" stop-color="#483c2a"/>
+        </linearGradient>
+        <linearGradient id="woodG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#a8824a"/><stop offset="100%" stop-color="#6b4f28"/>
+        </linearGradient>
+        <linearGradient id="rugG" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#6b5334" stop-opacity=".82"/>
+          <stop offset="50%" stop-color="#8a6c45" stop-opacity=".9"/>
+          <stop offset="100%" stop-color="#6b5334" stop-opacity=".82"/>
+        </linearGradient>
+        <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="26"/></filter>
+        <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
+        <filter id="shadowblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+        <filter id="reflectblur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+        <clipPath id="floorClip"><polygon points="0,700 1200,700 800,470 400,470"/></clipPath>
+        <clipPath id="rwallClip"><polygon points="1200,0 1200,700 800,470 800,190"/></clipPath>
+      </defs>
+
+      <!-- shell -->
+      <polygon class="surf ceil"   points="0,0 1200,0 800,190 400,190"/>
+      <polygon class="surf floorS" points="0,700 1200,700 800,470 400,470"/>
+      <polygon class="surf wallL"  points="0,0 0,700 400,470 400,190"/>
+      <polygon class="surf wall"   points="1200,0 1200,700 800,470 800,190"/>
+      <polygon class="surf back"   points="400,190 800,190 800,470 400,470"/>
+
+      <!-- floor planks running to the vanishing point -->
+      <g clip-path="url(#floorClip)" class="lit matx" opacity="0">
+        <g stroke="#000" stroke-opacity=".3" stroke-width="1.4">
+          <line x1="-120" y1="700" x2="437" y2="470"/><line x1="90" y1="700" x2="482" y2="470"/>
+          <line x1="300" y1="700" x2="527" y2="470"/><line x1="510" y1="700" x2="572" y2="470"/>
+          <line x1="720" y1="700" x2="628" y2="470"/><line x1="930" y1="700" x2="673" y2="470"/>
+          <line x1="1140" y1="700" x2="718" y2="470"/><line x1="1340" y1="700" x2="763" y2="470"/>
+        </g>
+        <g stroke="#000" stroke-opacity=".16" stroke-width="1">
+          <line x1="0" y1="610" x2="1200" y2="610"/><line x1="0" y1="556" x2="1200" y2="556"/>
+          <line x1="0" y1="518" x2="1200" y2="518"/><line x1="0" y1="492" x2="1200" y2="492"/>
+        </g>
+      </g>
+
+      <!-- baseboards -->
+      <g class="lit matx" opacity="0" fill="#000" fill-opacity=".26">
+        <polygon points="0,700 0,678 400,459 400,470"/>
+        <polygon points="1200,700 1200,678 800,459 800,470"/>
+        <rect x="400" y="459" width="400" height="11"/>
+      </g>
+
+      <!-- window -->
+      <g clip-path="url(#rwallClip)">
+        <polygon points="880,214 1160,176 1160,416 880,392" fill="#05070a"/>
+        <g class="lit dayx" opacity="0">
+          <polygon points="886,220 1154,183 1154,410 886,386" fill="url(#day)"/>
+          <g stroke="#0a0d10" stroke-opacity=".55" stroke-width="5">
+            <line x1="1020" y1="201" x2="1020" y2="398"/>
+            <line x1="886" y1="303" x2="1154" y2="296"/>
+          </g>
+        </g>
+      </g>
+      <g class="lit dayx" opacity="0" clip-path="url(#floorClip)">
+        <polygon points="1200,470 1200,700 620,700 790,478" fill="url(#daybeam)" filter="url(#soft)"/>
+      </g>
+
+      <!-- ceiling panels -->
+      <g class="strikegrp">
+        <polygon points="330,62 540,62 522,136 358,136" fill="#000" fill-opacity=".4"/>
+        <polygon points="660,62 870,62 842,136 678,136" fill="#000" fill-opacity=".4"/>
+        <g class="lit emit" opacity="0">
+          <g filter="url(#soft)">
+            <polygon points="336,68 534,68 700,700 176,700" fill="url(#cone)"/>
+            <polygon points="666,68 864,68 1024,700 500,700" fill="url(#cone)"/>
+          </g>
+          <g clip-path="url(#floorClip)" filter="url(#soft2)">
+            <ellipse cx="430" cy="612" rx="290" ry="96" fill="url(#pool2)"/>
+            <ellipse cx="770" cy="612" rx="290" ry="96" fill="url(#pool2)"/>
+          </g>
+          <polygon points="336,68 534,68 518,130 362,130" fill="#f7dcae"/>
+          <polygon points="666,68 864,68 838,130 682,130" fill="#f7dcae"/>
+          <g filter="url(#soft2)" opacity=".85">
+            <polygon points="336,68 534,68 518,130 362,130" fill="#f2c98a"/>
+            <polygon points="666,68 864,68 838,130 682,130" fill="#f2c98a"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- wall wash -->
+      <g class="lit ambx" opacity="0">
+        <polygon points="0,0 0,420 400,330 400,190" fill="url(#wash)"/>
+        <polygon points="1200,0 1200,420 800,330 800,190" fill="url(#wash)"/>
+        <rect x="400" y="190" width="400" height="150" fill="url(#wash)"/>
+      </g>
+
+      <!-- furniture -->
+      <g class="furn d1">
+        <ellipse cx="600" cy="596" rx="278" ry="74" fill="url(#rugG)"/>
+        <ellipse cx="600" cy="596" rx="232" ry="58" fill="none" stroke="#3f2f1c" stroke-opacity=".5" stroke-width="3"/>
+      </g>
+      <g class="furn d2">
+        <ellipse cx="600" cy="527" rx="168" ry="20" fill="#000" fill-opacity=".5" filter="url(#shadowblur)"/>
+        <rect x="452" y="432" width="296" height="52" rx="12" fill="url(#sofaG)"/>
+        <rect x="452" y="472" width="296" height="40" rx="10" fill="#33493a"/>
+        <rect x="452" y="466" width="296" height="8" rx="4" fill="#557060" opacity=".6"/>
+        <rect x="452" y="440" width="12" height="72" rx="6" fill="#2b402f"/>
+        <rect x="736" y="440" width="12" height="72" rx="6" fill="#2b402f"/>
+        <rect x="486" y="512" width="10" height="14" fill="#241a0f"/>
+        <rect x="704" y="512" width="10" height="14" fill="#241a0f"/>
+      </g>
+      <g class="furn d3">
+        <ellipse cx="600" cy="588" rx="86" ry="13" fill="#000" fill-opacity=".48" filter="url(#shadowblur)"/>
+        <rect x="518" y="556" width="164" height="13" rx="4" fill="url(#woodG)"/>
+        <rect x="518" y="569" width="164" height="5" rx="2" fill="#4c3619"/>
+        <rect x="534" y="574" width="8" height="18" fill="#54401f"/>
+        <rect x="658" y="574" width="8" height="18" fill="#54401f"/>
+      </g>
+      <g class="furn d4">
+        <ellipse cx="288" cy="618" rx="92" ry="17" fill="#000" fill-opacity=".48" filter="url(#shadowblur)"/>
+        <rect x="216" y="512" width="132" height="58" rx="14" fill="url(#chairG)"/>
+        <rect x="222" y="556" width="120" height="44" rx="11" fill="#5d4c34"/>
+        <rect x="222" y="550" width="120" height="8" rx="4" fill="#8e7a58" opacity=".55"/>
+        <rect x="238" y="600" width="9" height="16" fill="#241a0f"/>
+        <rect x="318" y="600" width="9" height="16" fill="#241a0f"/>
+      </g>
+      <g class="furn d5">
+        <ellipse cx="906" cy="584" rx="46" ry="11" fill="#000" fill-opacity=".45" filter="url(#shadowblur)"/>
+        <rect x="902" y="440" width="5" height="144" fill="#8a7038"/>
+        <path d="M878 440 L932 440 L922 402 L888 402 Z" fill="#d9b06a"/>
+        <ellipse cx="905" cy="442" rx="27" ry="7" fill="#ffe3b0" class="lit emit" opacity="0"/>
+        <ellipse cx="905" cy="470" rx="120" ry="130" fill="url(#pool)" class="lit emit" opacity="0" filter="url(#soft2)"/>
+      </g>
+      <g class="furn d5">
+        <ellipse cx="316" cy="470" rx="26" ry="8" fill="#000" fill-opacity=".4" filter="url(#shadowblur)"/>
+        <path d="M300 466 L332 466 L327 428 L305 428 Z" fill="#6d5738"/>
+        <g stroke="#4c6b4a" stroke-width="6" stroke-linecap="round" fill="none">
+          <path d="M316 428 L292 376"/><path d="M316 428 L316 362"/><path d="M316 428 L342 380"/>
+          <path d="M316 428 L300 392"/><path d="M316 428 L334 400"/>
+        </g>
+      </g>
+      <g class="furn d6">
+        <rect x="486" y="248" width="74" height="98" rx="2" fill="#0f0d0a" stroke="#c89b5c" stroke-width="3"/>
+        <rect x="498" y="260" width="50" height="74" fill="#3d4f45" opacity=".8"/>
+        <rect x="578" y="270" width="56" height="76" rx="2" fill="#0f0d0a" stroke="#c89b5c" stroke-width="3"/>
+        <rect x="588" y="280" width="36" height="56" fill="#5c4a33" opacity=".8"/>
+      </g>
+
+      <!-- floor reflections -->
+      <g class="furn d2" opacity=".18" clip-path="url(#floorClip)" filter="url(#reflectblur)">
+        <g transform="translate(0,1050) scale(1,-0.42)">
+          <rect x="452" y="432" width="296" height="80" rx="12" fill="#3a5244"/>
+          <rect x="518" y="556" width="164" height="18" rx="4" fill="#8a6c3f"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="torch" id="torch"></div>
+  <svg class="grain" aria-hidden="true">
+    <filter id="gr"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3"/></filter>
+    <rect width="100%" height="100%" filter="url(#gr)"/>
+  </svg>
+  <div class="vig"></div>
+
+  <!-- ===== Opening ===== -->
+  <div class="opening" id="opening">
+    <div class="brandmark">
+      <img data-logo class="brandlogo" alt="One Interiors" hidden>
+      <span class="wordmark t-mono">One Interiors · <span data-city>Pune</span></span>
+    </div>
+    <button class="joinbtn" id="joinBtn" type="button">Join Waitlist</button>
+    <p class="perk">
+      <span class="dot"></span>
+      <span>Waitlist members get a free consultation with a certified architect</span>
+    </p>
+    <div class="hint t-mono">Move your cursor — the room is still dark</div>
+  </div>
+
+  <!-- ===== Form ===== -->
+  <div class="cardwrap" id="cardwrap">
+    <form class="card" id="waitlistForm" novalidate>
+      <div class="prog" aria-hidden="true"><i id="p1" class="on"></i><i id="p2"></i><i id="p3"></i></div>
+
+      <div class="hp" aria-hidden="true">
+        <label for="company">Company</label>
+        <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+      </div>
+
+      <!-- Step 1 -->
+      <div class="step" id="s1">
+        <div class="eyebrow t-mono">Step 1 of 3</div>
+        <h2 class="t-title">What should we call you?</h2>
+        <p class="sub">Under thirty seconds. No account, no sales call.</p>
+        <div class="field">
+          <label class="t-mono" for="inName">Your name</label>
+          <input type="text" id="inName" name="name" autocomplete="given-name"
+                 placeholder="Sanyam" enterkeyhint="next">
+          <span class="err" id="errName" role="alert"></span>
+        </div>
+        <button class="cta" id="go1" type="button">Continue</button>
+        <p class="cardperk">
+          <span class="dot"></span>
+          <span>Everyone on this list gets a <b>free <span data-mins>45</span>-minute consultation
+          with a certified architect</b> — before you commit to anything.</span>
+        </p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step" id="s2" hidden>
+        <div class="eyebrow t-mono">Step 2 of 3</div>
+        <h2 id="greet" class="t-title">Good to meet you.</h2>
+        <p class="sub">Where should your invite and consultation slot go?</p>
+        <div class="field">
+          <label class="t-mono" for="inContact">Phone or email</label>
+          <input type="text" id="inContact" name="contact" autocomplete="tel"
+                 inputmode="tel" placeholder="+91 98XXX XXXXX" enterkeyhint="next">
+          <span class="err" id="errContact" role="alert"></span>
+        </div>
+        <button class="cta" id="go2" type="button">Continue</button>
+        <p class="cardperk">
+          <span class="dot"></span>
+          <span>We contact you once, to book your <b>free architect consultation</b>. Nothing else.</span>
+        </p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step" id="s3" hidden>
+        <div class="eyebrow t-mono">Step 3 of 3</div>
+        <h2 class="t-title">Which of these feels like home?</h2>
+        <p class="sub">The room behind this card is already listening.</p>
+        <div class="styles" role="group" aria-label="Style preference">
+          <button class="chip" type="button" aria-pressed="false" data-style="warm">Warm Minimalist</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="modern">Modern Classic</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="industrial">Industrial Loft</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="traditional">Traditional Indian</button>
+        </div>
+        <button class="cta" id="submitBtn" type="submit" disabled>
+          <span class="spin" aria-hidden="true"></span>
+          <span id="submitLabel">Claim my free consultation</span>
+        </button>
+        <div class="formerr" id="formErr" role="alert" hidden></div>
+        <p class="cardperk">
+          <span class="dot"></span>
+          <span>Joining <b><span data-count>412</span> <span data-city>Pune</span> homeowners</b>
+          already on the list. First cohort.</span>
+        </p>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== Finale ===== -->
+  <div class="finale" id="finale" role="status" aria-live="polite">
+    <img data-logo class="flogo" alt="One Interiors" hidden>
+    <div class="fmark t-mono">You're on the list</div>
+    <h1 class="t-display">Just like this, your space comes together.</h1>
+    <p class="flead">Now sit back and relax. We'll design it for you.</p>
+    <p class="fperk">
+      <span class="dot"></span>
+      <span>Your <b>free architect consultation</b> is reserved — we'll call to book it.</span>
+    </p>
+    <button class="ghost" id="demoBtn" type="button" hidden>See how it works</button>
+
+    <div class="share" id="shareBlock">
+      <span class="label t-mono">Know someone mid-renovation?</span>
+      <button class="ghost" id="shareBtn" type="button">Share the waitlist</button>
+    </div>
+  </div>
+
+  <!-- ===== Demo ===== -->
+  <div class="demo" id="demo" hidden>
+    <div class="demo-frame">
+      <video id="demoVid" playsinline controls preload="none"></video>
+    </div>
+    <button class="ghost" id="demoClose" type="button">Back</button>
+    <span class="cap t-mono">One Interiors — how it works</span>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

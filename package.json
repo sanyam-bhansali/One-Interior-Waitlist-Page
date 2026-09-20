@@ -1,0 +1,16 @@
+{
+  "name": "one-interiors-waitlist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cinematic waitlist landing page for One Interiors, Pune.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "serve": "npx --yes serve public",
+    "frames": "node scripts/build-frames.mjs",
+    "deploy": "vercel --prod"
+  }
+}

@@ -1,0 +1,6 @@
+# Nothing here needs to reach the edge. Keeps the deploy small and fast.
+source/
+scripts/
+docs/
+*.md
+!public/**

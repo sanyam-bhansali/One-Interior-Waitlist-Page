@@ -1,0 +1,16 @@
+node_modules/
+.vercel
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# Raw production material: renders, stills, voiceover, rough cuts.
+# ~42 MB and all regenerable (`npm run frames` rebuilds public/assets/seq
+# from the clips). Keep it in Drive or Dropbox, not in the repo.
+# NOTE: "source/*.mp4" would NOT have caught source/stills/ or source/vo/ —
+# git's * does not match across a slash. Ignore the whole directory.
+source/
+
+# Scratch
+*.log
