@@ -73,21 +73,24 @@ window.Stickman = (function () {
      Absolute ms, in one table so the performance can be re-timed
      without touching the poses. */
   var T = {
-    walkIn:  [0, 1500],
-    windUp:  [1500, 1810],
-    kick:    [1810, 2020],
-    impact:  1975,
-    recover: [2020, 2300],
-    walkMid: [2300, 2820],    // strolls to centre stage
-    turn:    [2820, 3180],    // rotates front-on
-    hold:    [3180, 3800],    // looks you in the eye. the charisma beat.
-    point:   [3800, 4130],    // tells you where to look next
-    crouch:  [4130, 4370],
-    jump:    [4370, 4790],
-    grab:    [4790, 4940],
-    pull:    [4940, 6030],
-    hang:    [6030, 6240],
-    fall:    [6240, 6660]
+    fallIn:   [0, 520],       // drops in from above
+    land:     [520, 900],     // impact, crumpled
+    getUp:    [900, 1440],
+    dust:     [1440, 2120],   // brushes himself off
+    turnCam:  [2120, 2440],
+    hold:     [2440, 3020],   // looks you in the eye. the charisma beat.
+    turnBack: [3020, 3240],   // squares up to the text
+    windUp:   [3240, 3520],
+    kick:     [3520, 3720],
+    impact:   3676,
+    recover:  [3720, 4000],
+    walkMid:  [4000, 4430],
+    crouch:   [4430, 4660],
+    jump:     [4660, 5070],
+    grab:     [5070, 5220],
+    pull:     [5220, 6290],
+    hang:     [6290, 6490],
+    fall:     [6490, 6900]
   };
   var END = T.fall[1];
 
@@ -159,6 +162,43 @@ window.Stickman = (function () {
     p.shoR = Math.PI + 0.10; p.elbR = -0.07;
   }
 
+
+  /* ---------- dust -------------------------------------------
+     He arrives hard enough to raise some, and then brushes it off.
+     Cheap particles, drawn on the same canvas: it costs almost
+     nothing and it is what sells the landing as an impact rather
+     than an arrival. */
+  var motes = [];
+  function puff(x, y, n, speed, upward) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.PI + Math.random() * Math.PI;      // outward and up
+      var v = speed * (0.35 + Math.random() * 0.9);
+      motes.push({
+        x: x + (Math.random() - 0.5) * speed * 0.5, y: y,
+        vx: Math.cos(a) * v * 1.5,
+        vy: Math.sin(a) * v * (upward === undefined ? 1 : upward),
+        r: 0.7 + Math.random() * 2.1,
+        life: 1, decay: 0.010 + Math.random() * 0.016
+      });
+    }
+  }
+  function drawMotes(ctx, col, dt) {
+    var k = Math.min(3, dt / 16.7);                   // frame-rate independent
+    for (var i = motes.length - 1; i >= 0; i--) {
+      var m = motes[i];
+      m.x += m.vx * k; m.y += m.vy * k;
+      m.vy += 0.085 * k;                              // gravity
+      m.vx *= 0.975; m.vy *= 0.975;                   // air
+      m.life -= m.decay * k;
+      if (m.life <= 0) { motes.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, m.life) * 0.62;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * (0.4 + m.life * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
 
   /* ---------- the face --------------------------------------
      Drawn once, after both stroke passes, so it stays crisp on top
@@ -336,41 +376,143 @@ window.Stickman = (function () {
   }
 
   /* ---------- the performance --------------------------------
-     Order matters as much as the poses: he kicks where the text is,
-     then walks to centre stage BEFORE turning to you. Looking down
-     the lens from off-centre reads as an accident; from the middle
-     of the frame it reads as address. */
+     He arrives by falling, which is funnier and faster than walking
+     on, and it gives the landing an impact to squash into. Then the
+     order of business is: get up, brush off, look at you, and only
+     THEN deal with the text. Establishing him before he does
+     anything is what makes the kick read as a character's choice
+     rather than a transition effect. */
   function build(t, C) {
     var H = C.H, ground = C.ground, p = pose();
     var kickX = C.kickX, midX = C.midX, stand = ground - LEG * H;
+    p.hipX = kickX;
     p.hipY = stand;
 
-    /* 1 · walk in — cheerful, on his way to do something about it */
-    if (t < T.walkIn[1]) {
-      var u = span(t, T.walkIn);
-      p.hipX = lerp(C.startX, kickX, easeInOut(u));
-      walk(p, t * 0.0125, H, 1 - 0.55 * easeIn(u));
-      setFace(p, 1, 0.40, 0.12, 0);
+    /* 1 · falls in from above — tucked, arms trailing, alarmed */
+    if (t < T.fallIn[1]) {
+      var u = span(t, T.fallIn);
+      p.hipY = lerp(-H * 1.5, stand, easeIn(u));      // gravity accelerates
+      p.shoL = Math.PI - 0.34; p.shoR = Math.PI + 0.34;
+      p.elbL = 0.22; p.elbR = -0.22;
+      p.hipL = 0.34; p.kneeL = 0.80;
+      p.hipR = -0.22; p.kneeR = 0.62;
+      p.lean = 0.06 * Math.sin(u * 5);
+      p.headLag = -0.10;
+      p.sq = 1 + 0.30 * u;                            // stretches as he speeds up
+      p.airborne = 1; p.shadow = 0.5 * u;             // shadow rushes up to meet him
+      setFace(p, 0.25, -0.2, 0.9, 0.85);              // brows up, mouth open
       return p;
     }
 
-    /* 2 · wind up — the smile drops, the brows come down */
+    /* 2 · impact — deep squash, collapsed, eyes shut */
+    if (t < T.land[1]) {
+      var l = span(t, T.land);
+      var s2 = settle(l, 1);
+      p.hipY = stand + 0.30 * H * (1 - s2);
+      p.sq = lerp(0.52, 1, s2);                       // the squash of the whole piece
+      p.hipL = lerp(0.85, 0.40, s2); p.kneeL = lerp(1.35, 0.80, s2);
+      p.hipR = lerp(-0.70, -0.30, s2); p.kneeR = lerp(1.20, 0.70, s2);
+      p.shoL = lerp(1.15, 0.75, s2); p.elbL = lerp(0.55, 0.40, s2);
+      p.shoR = lerp(-1.05, -0.70, s2); p.elbR = lerp(-0.55, -0.40, s2);
+      p.lean = 0.26 * (1 - s2);
+      p.headLag = 0.14 * (1 - s2);
+      setFace(p, 0.3, -0.3, -0.5, 0.6 * (1 - l), 1 - l * 2.2);
+      return p;
+    }
+
+    /* 3 · gets up */
+    if (t < T.getUp[1]) {
+      var g = easeOut(span(t, T.getUp));
+      p.hipY = stand;
+      p.hipL = lerp(0.40, 0.12, g); p.kneeL = lerp(0.80, 0.08, g);
+      p.hipR = lerp(-0.30, -0.12, g); p.kneeR = lerp(0.70, 0.08, g);
+      p.shoL = lerp(0.75, 0.30, g); p.elbL = lerp(0.40, 0.18, g);
+      p.shoR = lerp(-0.70, -0.30, g); p.elbR = lerp(-0.40, -0.18, g);
+      p.lean = 0.10 * (1 - g);
+      p.headLag = -0.08 * g;
+      p.sq = lerp(0.94, 1, g);
+      setFace(p, 0.45, lerp(-0.5, 0.35, g), lerp(-0.3, 0.2, g), 0);
+      return p;
+    }
+
+    /* 4 · brushes the dust off — shoulders, then the thighs. Three
+           passes, because two reads as a twitch and four as a tic. */
+    if (t < T.dust[1]) {
+      var d = span(t, T.dust);
+      var swipe = Math.sin(d * Math.PI * 3.2);
+      var low = clamp01((d - 0.55) / 0.45);           // second half goes lower
+      p.hipY = stand - 0.012 * H * Math.abs(swipe);
+      p.turn = 0.35;
+      // one hand does the work, the other stays out of the way
+      p.shoL = lerp(1.05, 0.55, low) + swipe * 0.30;
+      p.elbL = lerp(-1.15, -0.75, low) - swipe * 0.22;
+      p.shoR = -0.34; p.elbR = -0.18;
+      p.hipL = 0.12; p.kneeL = 0.08; p.hipR = -0.12; p.kneeR = 0.08;
+      p.lean = 0.10 + swipe * 0.045 + low * 0.10;
+      p.headLag = -0.10 - low * 0.12;
+      p.sq = 1 - 0.02 * Math.abs(swipe);
+      setFace(p, 0.35, 0.45, 0.15, 0);
+      return p;
+    }
+
+    /* 5 · turns to the lens */
+    if (t < T.turnCam[1]) {
+      var tn = easeOut(span(t, T.turnCam));
+      p.turn = lerp(0.35, 0, tn);
+      p.hipL = 0.10; p.kneeL = 0.07; p.hipR = -0.10; p.kneeR = 0.07;
+      p.shoL = lerp(0.55, 0.16, tn); p.elbL = lerp(-0.75, 0.10, tn);
+      p.shoR = -0.16; p.elbR = -0.10;
+      p.lean = 0.10 * (1 - tn);
+      p.headLag = -0.05 * (1 - tn);
+      p.sq = 1 + 0.02 * Math.sin(tn * Math.PI);
+      p.face = { smile: lerp(0.45, 1, tn), brow: lerp(0.2, 0.55, tn), open: 0, blink: 0 };
+      return p;
+    }
+
+    /* 6 · hold — straight down the lens. One blink, one breath, and
+           nothing else. This beat is the whole character. */
+    if (t < T.hold[1]) {
+      var hd = span(t, T.hold);
+      p.turn = 0;
+      p.hipL = 0.08; p.kneeL = 0.07; p.hipR = -0.08; p.kneeR = 0.07;
+      p.shoL = 0.16; p.shoR = -0.16; p.elbL = 0.10; p.elbR = -0.10;
+      var breathe = Math.sin(hd * Math.PI * 1.7);
+      p.sq = 1 + 0.018 * breathe;
+      p.hipY = stand - 0.008 * H * breathe;
+      p.face = { smile: 1, brow: 0.55, open: 0,
+                 blink: Math.max(0, 1 - Math.abs(hd - 0.42) * 22) };
+      return p;
+    }
+
+    /* 7 · squares up to the text. The smile goes first, then the
+           shoulders — the face always turns before the body. */
+    if (t < T.turnBack[1]) {
+      var tb = easeInOut(span(t, T.turnBack));
+      p.turn = tb;
+      p.hipL = 0.10; p.kneeL = 0.07; p.hipR = -0.10; p.kneeR = 0.07;
+      p.shoL = lerp(0.16, 0.10, tb); p.elbL = 0.12;
+      p.shoR = lerp(-0.16, -0.10, tb); p.elbR = 0.12;
+      p.lean = 0.06 * tb;
+      setFace(p, tb, lerp(1, 0.15, tb), lerp(0.55, -0.35, tb), 0);
+      return p;
+    }
+
+    /* 8 · wind up */
     if (t < T.windUp[1]) {
       var w = easeOut(span(t, T.windUp));
-      p.hipX = kickX;
       p.lean = -0.22 * w;
       p.headLag = 0.10 * w;
-      p.hipL = -0.55 * w; p.kneeL = 0.88 * w;
-      p.hipR = 0.16 * w; p.kneeR = 0.10 * w;
-      p.shoL = -0.72 * w; p.elbL = 0.52 * w;
-      p.shoR = 0.56 * w; p.elbR = 0.36 * w;
+      p.hipL = lerp(0.10, -0.55, w); p.kneeL = 0.88 * w;
+      p.hipR = lerp(-0.10, 0.16, w); p.kneeR = 0.10 * w;
+      p.shoL = lerp(0.10, -0.72, w); p.elbL = 0.52 * w;
+      p.shoR = lerp(-0.10, 0.56, w); p.elbR = 0.36 * w;
       p.sq = 1 - 0.10 * w;
       p.hipY = stand + 0.035 * H * w;
-      setFace(p, 1, lerp(0.40, -0.15, w), lerp(0.12, -0.85, w), 0);
+      setFace(p, 1, lerp(0.15, -0.20, w), lerp(-0.35, -0.95, w), 0);
       return p;
     }
 
-    /* 3 · kick — mouth open on the effort */
+    /* 9 · kick */
     if (t < T.kick[1]) {
       var k = easeOut(span(t, T.kick));
       p.hipX = kickX + 0.045 * H * k;
@@ -388,7 +530,7 @@ window.Stickman = (function () {
       return p;
     }
 
-    /* 4 · recover — the effort resolves into a grin */
+    /* 10 · recover */
     if (t < T.recover[1]) {
       var r = span(t, T.recover), re = easeOut(r);
       p.hipX = kickX + 0.045 * H;
@@ -400,90 +542,42 @@ window.Stickman = (function () {
       p.shoR = 1.28 * (1 - re); p.elbR = 0.12 + 0.24 * (1 - re);
       p.sq = 1 - 0.14 * (1 - settle(r, 1));
       p.hipY = stand - 0.02 * H * (1 - re);
-      setFace(p, 0.94, lerp(-0.2, 0.75, re), lerp(-1, 0.3, re), 0.5 * (1 - re));
+      setFace(p, 0.94, lerp(-0.2, 0.85, re), lerp(-1, 0.4, re), 0.5 * (1 - re));
       return p;
     }
 
-    /* 5 · stroll to centre stage, pleased with himself */
+    /* 11 · to centre stage, on an empty screen */
     if (t < T.walkMid[1]) {
       var m = easeInOut(span(t, T.walkMid));
       p.hipX = lerp(kickX + 0.045 * H, midX, m);
       walk(p, t * 0.0125, H, 0.85);
-      setFace(p, 0.9, 0.75, 0.3, 0);
+      setFace(p, 0.9, 0.8, 0.35, 0);
       return p;
     }
 
-    /* 6 · turn — the head comes round to the lens, weight settles
-           onto both feet, hands drop to his sides */
-    if (t < T.turn[1]) {
-      var tn = easeOut(span(t, T.turn));
-      p.hipX = midX;
-      p.turn = 1 - tn;
-      p.hipL = 0.13 * (1 - tn * 0.4); p.kneeL = 0.07;
-      p.hipR = -0.13 * (1 - tn * 0.4); p.kneeR = 0.07;
-      p.shoL = 0.16 * tn; p.shoR = -0.16 * tn;
-      p.elbL = 0.10; p.elbR = -0.10;
-      p.lean = 0.05 * (1 - tn);
-      p.headLag = -0.05 * (1 - tn);
-      p.sq = 1 + 0.02 * Math.sin(tn * Math.PI);
-      p.face = { smile: lerp(0.75, 1, tn), brow: lerp(0.3, 0.55, tn), open: 0, blink: 0 };
-      return p;
-    }
-
-    /* 7 · hold — straight down the lens. He blinks once, breathes
-           once, and does nothing else. This beat is the character. */
-    if (t < T.hold[1]) {
-      var hd = span(t, T.hold);
-      p.hipX = midX;
-      p.turn = 0;
-      p.hipL = 0.08; p.kneeL = 0.07; p.hipR = -0.08; p.kneeR = 0.07;
-      p.shoL = 0.16; p.shoR = -0.16; p.elbL = 0.10; p.elbR = -0.10;
-      var breathe = Math.sin(hd * Math.PI * 1.6);
-      p.sq = 1 + 0.018 * breathe;
-      p.hipY = stand - 0.008 * H * breathe;
-      // one blink, 40% of the way in — enough to read as alive
-      var bl = Math.max(0, 1 - Math.abs(hd - 0.40) * 22);
-      p.face = { smile: 1, brow: 0.55, open: 0, blink: bl };
-      return p;
-    }
-
-    /* 8 · point — still mostly facing you, arm up to the top edge */
-    if (t < T.point[1]) {
-      var pt = easeOut(span(t, T.point));
-      p.hipX = midX;
-      p.turn = 0.22 * pt;
-      p.shoL = lerp(0.16, Math.PI - 0.20, pt); p.elbL = lerp(0.10, 0, pt);
-      p.shoR = -0.16; p.elbR = -0.10;
-      p.hipL = 0.08; p.kneeL = 0.07; p.hipR = -0.08; p.kneeR = 0.07;
-      p.lean = -0.10 * pt;
-      p.headLag = -0.16 * pt;
-      p.sq = 1 + 0.03 * pt;
-      setFace(p, p.turn, 0.9, 0.65, 0);
-      return p;
-    }
-
-    /* 9 · crouch */
+    /* 12 · crouch — anticipation, and he glances up at what he is
+            about to grab, which is all the staging this needs */
     if (t < T.crouch[1]) {
       var c = easeInOut(span(t, T.crouch));
       p.hipX = midX;
-      p.turn = 0.22;
-      p.hipL = lerp(0.08, 0.42, c); p.kneeL = lerp(0.07, 0.86, c);
-      p.hipR = lerp(-0.08, 0.30, c); p.kneeR = lerp(0.07, 0.86, c);
-      p.shoL = lerp(Math.PI - 0.20, -0.62, c); p.shoR = lerp(-0.16, -0.62, c);
+      p.turn = lerp(0.9, 0.25, c);
+      p.hipL = lerp(0.12, 0.42, c); p.kneeL = lerp(0.08, 0.86, c);
+      p.hipR = lerp(-0.12, 0.30, c); p.kneeR = lerp(0.08, 0.86, c);
+      p.shoL = -0.62 * c; p.shoR = -0.62 * c;
       p.elbL = 0.12 + 0.52 * c; p.elbR = p.elbL;
       p.lean = 0.18 * c;
-      p.headLag = -0.10 * c;
+      p.headLag = -0.14 * c;
       p.sq = 1 - 0.20 * c;
       p.hipY = stand + 0.175 * H * c;
-      setFace(p, 0.22, lerp(0.9, 0.2, c), lerp(0.65, -0.55, c), 0);
+      setFace(p, p.turn, lerp(0.8, 0.25, c), lerp(0.35, -0.5, c), 0);
       return p;
     }
 
-    /* 10 · jump */
+    /* 13 · jump */
     if (t < T.jump[1]) {
       var j = span(t, T.jump), je = easeOut(j);
       p.hipX = midX;
-      p.turn = 0.18;
+      p.turn = 0.2;
       p.hipY = lerp(stand + 0.175 * H, C.apexHipY, je);
       p.shoL = lerp(-0.62, Math.PI, je); p.shoR = p.shoL;
       p.elbL = (0.12 + 0.52) * (1 - je); p.elbR = p.elbL;
@@ -493,11 +587,11 @@ window.Stickman = (function () {
       p.headLag = -0.10 + 0.16 * je;
       p.sq = 1 + 0.26 * Math.sin(j * Math.PI) * (1 - j * 0.5);
       p.airborne = je;
-      setFace(p, 0.18, 0.1, -0.35, 0.45 + 0.4 * Math.sin(j * Math.PI));
+      setFace(p, 0.2, 0.1, -0.35, 0.45 + 0.4 * Math.sin(j * Math.PI));
       return p;
     }
 
-    /* 11 · grab — the edge gives under him, then holds */
+    /* 14 · grab — the edge gives, then holds */
     if (t < T.grab[1]) {
       var ct = span(t, T.grab), jolt = Math.sin(ct * Math.PI);
       p.hipX = midX;
@@ -512,10 +606,10 @@ window.Stickman = (function () {
       return p;
     }
 
-    /* 12 · pull — hands pinned to the edge, the body hanging off
-            them. Solving downward from the hands rather than up from
-            the hips is what makes his weight look like the thing
-            moving the screen. He is straining, and it shows. */
+    /* 15 · pull — hands pinned to the edge, body hanging off them.
+            Solving downward from the hands rather than up from the
+            hips is what makes his weight look like the thing moving
+            the screen. */
     if (t < T.pull[1]) {
       var q = span(t, T.pull);
       p._handY = lerp(C.apexHandY, C.vh, easeInOut(q));
@@ -532,7 +626,7 @@ window.Stickman = (function () {
       return p;
     }
 
-    /* 13 · hang — it worked. He knows it worked. */
+    /* 16 · hang — it worked, and he knows it */
     if (t < T.hang[1]) {
       var hgt = span(t, T.hang), kk = Math.sin(hgt * Math.PI * 2.6) * 0.30 * (1 - hgt * 0.4);
       p._handY = C.vh;
@@ -543,11 +637,11 @@ window.Stickman = (function () {
       p.hipR = -0.26 - kk; p.kneeR = 0.62 + kk * 0.4;
       p.lean = kk * 0.2; p.headLag = -kk * 0.3;
       p.airborne = 1; p.shadow = 0;
-      setFace(p, 0, 0.85, 0.45, 0);
+      setFace(p, 0, 0.9, 0.5, 0);
       return p;
     }
 
-    /* 14 · lets go */
+    /* 17 · lets go */
     var f = span(t, T.fall);
     p._handY = C.vh;
     p.hipX = midX;
@@ -558,6 +652,25 @@ window.Stickman = (function () {
     p.alpha = 1 - f; p.airborne = 1; p.shadow = 0;
     setFace(p, 0, 1, 0.5, 0.35);
     return p;
+  }
+
+  /* The finale is inset:0, so its own box is the whole viewport and
+     tells us nothing. Union its visible children instead — that is
+     the actual footprint of the text. */
+  function unionRect(el) {
+    if (!el) return null;
+    var kids = el.children, L = Infinity, R = -Infinity, T2 = Infinity, B = -Infinity, n = 0;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      if (k.hidden || k.offsetParent === null) continue;
+      var b = k.getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      L = Math.min(L, b.left); R = Math.max(R, b.right);
+      T2 = Math.min(T2, b.top); B = Math.max(B, b.bottom);
+      n++;
+    }
+    if (!n) return null;
+    return { left: L, right: R, top: T2, bottom: B, width: R - L, height: B - T2 };
   }
 
   /* ---------- runner ----------------------------------------- */
@@ -596,15 +709,19 @@ window.Stickman = (function () {
 
       C.H = Math.max(132, Math.min(C.vh * 0.28, 240));
 
-      // Stand him on the line he is about to kick, so the foot meets
-      // the actual glyphs rather than a lucky coincidence of timing.
+      /* Two different measurements, and conflating them was a bug:
+         the FLOOR comes from the line he stands on, but how far left
+         he must stand comes from the WIDEST thing on screen. Taking
+         both from the narrow lead line put him on top of the
+         headline the moment the headline got bigger. */
       var r = opts.target && opts.target.getBoundingClientRect();
+      var blk = unionRect(opts.block) || r;
       if (r && r.width) {
         C.ground = r.bottom + C.H * 0.05;
-        C.kickX = Math.max(C.H * 0.5, r.left - C.H * 0.40);
+        C.kickX = Math.max(C.H * 0.52, (blk ? blk.left : r.left) - C.H * 0.44);
       } else {
         C.ground = C.vh * 0.62;
-        C.kickX = C.vw * 0.40;
+        C.kickX = C.vw * 0.34;
       }
       C.midX = C.vw * 0.5;
       C.startX = -C.H * 0.7;
@@ -618,12 +735,15 @@ window.Stickman = (function () {
     var col = getComputedStyle(document.documentElement)
       .getPropertyValue('--bone').trim() || '#f4f1e9';
 
+    motes.length = 0;                 // a re-run starts on a clean floor
+
     return new Promise(function (resolve) {
-      var t0 = 0, kicked = false, done = false;
+      var t0 = 0, last = 0, kicked = false, landed = false, done = false, brushed = -1;
 
       function finish(skipped) {
         if (done) return;
         done = true; active = null;
+        motes.length = 0;
         ctx.clearRect(0, 0, C.vw, C.vh);
         window.removeEventListener('resize', measure);
         if (!kicked && opts.onKick) { kicked = true; opts.onKick(); }
@@ -635,11 +755,26 @@ window.Stickman = (function () {
 
       function frame(now) {
         if (done) return;
-        if (!t0) t0 = now;
-        var t = now - t0;
+        if (!t0) { t0 = now; last = now; }
+        var t = now - t0, dt = Math.min(64, now - last);
+        last = now;
 
         ctx.clearRect(0, 0, C.vw, C.vh);
         var p = build(t, C);
+
+        // Dust on the frame he hits the floor, not on the phase change.
+        if (!landed && t >= T.land[0]) {
+          landed = true;
+          puff(C.kickX, C.ground, 26, C.H * 0.055);
+        }
+        // and a little comes off him while he brushes
+        if (t >= T.dust[0] && t < T.dust[1]) {
+          var bi = Math.floor((t - T.dust[0]) / 150);
+          if (bi !== brushed) {
+            brushed = bi;
+            puff(C.kickX + C.H * 0.10, C.ground - C.H * 0.42, 4, C.H * 0.012, 0.35);
+          }
+        }
 
         // Fires once, on the frame the foot is at full extension —
         // not when the phase begins.
@@ -650,6 +785,7 @@ window.Stickman = (function () {
         if (p._handY !== undefined && opts.onPull) opts.onPull(p._handY);
 
         render(ctx, p, C.H, col, C.ground);
+        drawMotes(ctx, col, dt);
 
         if (t < END) requestAnimationFrame(frame);
         else finish(false);

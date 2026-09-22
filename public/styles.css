@@ -22,7 +22,7 @@
   /* ---- type scale ----
      A fourth-based scale. Every size on the page comes from here;
      nothing is hardcoded in a rule. */
-  --fs-display:clamp(30px, 5.4vw, 54px);
+  --fs-display:clamp(36px, 7.2vw, 78px);
   --fs-title:clamp(22px, 2.4vw, 26px);
   --fs-lead:15px;
   --fs-body:14.5px;
@@ -482,7 +482,7 @@ button{font:inherit;color:inherit}
 /* Landscape phone: vertical space is the scarce resource. Let the
    card scroll inside itself rather than pushing off-screen. */
 @media (max-height:560px) and (orientation:landscape){
-  :root{ --fs-display:clamp(22px,4vw,30px); --card-w:420px; }
+  :root{ --fs-display:clamp(27px,5.6vw,40px); --card-w:420px; }
   .cardwrap{padding:14px}
   .card{padding:20px 22px 18px; max-height:calc(100dvh - 28px); overflow-y:auto}
   .prog{margin-bottom:14px}

@@ -773,7 +773,8 @@
     document.addEventListener('keydown', onKey);
 
     return Stickman.run({
-      target: flead,
+      target: flead,      // the line he stands on
+      block: finale,      // the full width of what he has to clear
 
       // hide:true retires the element in the same tick the sweep
       // ends — otherwise clearing the inline opacity hands it back
