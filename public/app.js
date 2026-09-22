@@ -551,7 +551,7 @@
         if (!(CFG.demoVideo && CFG.demoVideo.src)) return;
         // Let them read the finale before anything happens to it.
         return wait(2100).then(function () {
-          if (CFG.stickman !== false && window.Stickman && Stickman.supported()) return curtain();
+          if (CFG.stickman !== false && window.Stickman && Stickman.supported()) return curtain(skippedBefore());
           var b = document.getElementById('demoBtn');
           b.hidden = false;
           return FX.materialize(b, 'shown', { duration: 700, count: 220 });
@@ -626,6 +626,7 @@
 
     document.getElementById('demoBtn').addEventListener('click', function () {
       CFG.track('demo_open', {});
+      document.body.classList.add('film');
       FX.dissolve(finale, { duration: 900 })
         .then(function () { return wait(reduce ? 80 : 400); })
         .then(function () { return FX.materialize(demo, 'shown', { duration: 1200 }); })
@@ -634,8 +635,10 @@
 
     document.getElementById('demoClose').addEventListener('click', function () {
       vid.pause();
+      document.body.classList.remove('film');
       var flead = document.querySelector('.flead');
-      if (flead) flead.hidden = false;
+      if (flead) flead.hidden = false;   // in case an older visit hid it alone
+      finale.hidden = false;
       var b = document.getElementById('demoBtn');
       if (b && b.hidden) { b.hidden = false; b.classList.add('shown'); }
       FX.dissolve(demo, { duration: 800 })
@@ -703,18 +706,71 @@
      function only translates those two events into page state, so
      the timing lives entirely in stickman.js.
      ============================================================ */
-  function curtain() {
+  var SKIP_KEY = 'oi_anim_skipped';
+  function skippedBefore() {
+    try { return localStorage.getItem(SKIP_KEY) === '1'; } catch (e) { return false; }
+  }
+  function rememberSkip() {
+    try { localStorage.setItem(SKIP_KEY, '1'); } catch (e) {}
+  }
+
+  function curtain(instant) {
     var demoEl = document.getElementById('demo');
     var vid = document.getElementById('demoVid');
     var flead = document.querySelector('.flead');
+    var skipBtn = document.getElementById('skipBtn');
     var vh = window.innerHeight;
+    var showTimer = 0;
 
     document.body.classList.add('curtain');
     demoEl.hidden = false;
     demoEl.classList.add('blind');
     demoEl.style.transform = 'translateY(-101%)';   // 1% over, so no hairline gap
 
+    function land() {
+      demoEl.style.transform = '';
+      demoEl.classList.remove('blind');
+      demoEl.classList.add('shown');
+      finale.classList.remove('shown');
+      finale.hidden = true;
+      document.body.classList.remove('curtain');
+      document.body.classList.add('film');
+      playDemo(vid);
+    }
+
+    function hideSkip() {
+      clearTimeout(showTimer);
+      skipBtn.classList.remove('shown');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(function () { skipBtn.hidden = true; }, 450);
+    }
+    function onKey(e) {
+      // Escape is the reflex; Enter/Space are handled by the button itself.
+      if (e.key === 'Escape') { e.preventDefault(); doSkip(); }
+    }
+    function doSkip() {
+      CFG.track('curtain_skip', {});
+      rememberSkip();          // don't make them ask twice on this device
+      hideSkip();
+      Stickman.skip();         // lands on the same end state as a full watch
+    }
+
+    // They already told us once that they would rather not watch it.
+    if (instant) {
+      CFG.track('curtain_instant', {});
+      FX.dissolve(finale, { duration: 240, hide: true });
+      land();
+      return Promise.resolve();
+    }
+
     CFG.track('curtain_start', {});
+
+    // A beat late: an escape hatch offered before he has even walked
+    // on reads as an apology for the thing you just built.
+    skipBtn.hidden = false;
+    skipBtn.onclick = doSkip;
+    showTimer = setTimeout(function () { skipBtn.classList.add('shown'); }, 900);
+    document.addEventListener('keydown', onKey);
 
     return Stickman.run({
       target: flead,
@@ -723,7 +779,10 @@
       // ends — otherwise clearing the inline opacity hands it back
       // at full strength for one frame.
       onKick: function () {
-        if (flead) FX.dissolve(flead, { duration: 620, hide: true });
+        // Everything goes: headline, line, perk, share block. The foot
+        // is measured against .flead only because that is where the
+        // text sits on screen — the whole block is what it clears.
+        FX.dissolve(finale, { duration: 700, hide: true });
       },
 
       onPull: function (handY) {
@@ -731,12 +790,8 @@
       },
 
       onDone: function () {
-        demoEl.style.transform = '';
-        demoEl.classList.remove('blind');
-        demoEl.classList.add('shown');
-        finale.classList.remove('shown');
-        document.body.classList.remove('curtain');
-        playDemo(vid);
+        hideSkip();
+        land();
       }
     });
   }

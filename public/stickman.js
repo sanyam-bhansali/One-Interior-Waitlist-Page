@@ -42,6 +42,9 @@
 
    Public API
      Stickman.run({ target, onKick, onPull, onDone })   → Promise
+     Stickman.skip()      abandon mid-performance and land on the
+                          same end state, so a skip and a full watch
+                          are indistinguishable afterwards
      Stickman.supported()                               → boolean
    ============================================================ */
 
@@ -55,7 +58,7 @@ window.Stickman = (function () {
      and small-headed: a big round head reads as a cartoon, and
      this page is not a cartoon. */
   var P = {
-    headR: 0.082,
+    headR: 0.098,   // roomy enough to carry eyes and a mouth
     neck: 0.132,
     torso: 0.250,
     thigh: 0.230,
@@ -70,20 +73,21 @@ window.Stickman = (function () {
      Absolute ms, in one table so the performance can be re-timed
      without touching the poses. */
   var T = {
-    walkIn: [0, 1650],
-    windUp: [1650, 1960],
-    kick: [1960, 2170],
-    impact: 2120,
-    recover: [2170, 2470],
-    brush: [2470, 2790],   // "job done"
-    point: [2790, 3140],   // staging: tells you where to look
-    walkMid: [3140, 3620],
-    crouch: [3620, 3880],
-    jump: [3880, 4310],
-    grab: [4310, 4470],     // the edge gives under him, then holds
-    pull: [4470, 5610],
-    hang: [5610, 5830],    // the comedy beat before he lets go
-    fall: [5830, 6260]
+    walkIn:  [0, 1500],
+    windUp:  [1500, 1810],
+    kick:    [1810, 2020],
+    impact:  1975,
+    recover: [2020, 2300],
+    walkMid: [2300, 2820],    // strolls to centre stage
+    turn:    [2820, 3180],    // rotates front-on
+    hold:    [3180, 3800],    // looks you in the eye. the charisma beat.
+    point:   [3800, 4130],    // tells you where to look next
+    crouch:  [4130, 4370],
+    jump:    [4370, 4790],
+    grab:    [4790, 4940],
+    pull:    [4940, 6030],
+    hang:    [6030, 6240],
+    fall:    [6240, 6660]
   };
   var END = T.fall[1];
 
@@ -115,7 +119,13 @@ window.Stickman = (function () {
       sq: 1,            // <1 squashed, >1 stretched
       alpha: 1,
       shadow: 1,        // 0..1 strength
-      airborne: 0
+      airborne: 0,
+      /* turn: 1 = full profile facing the way he walks, 0 = looking
+         straight down the lens. The eyes slide across the head and the
+         far one fades — the standard 2D cheat, and it reads as a head
+         turning far better than any real rotation of a circle would. */
+      turn: 1,
+      face: { smile: 0.35, brow: 0, open: 0, blink: 0 }
     };
   }
 
@@ -149,6 +159,89 @@ window.Stickman = (function () {
     p.shoR = Math.PI + 0.10; p.elbR = -0.07;
   }
 
+
+  /* ---------- the face --------------------------------------
+     Drawn once, after both stroke passes, so it stays crisp on top
+     of the dark separation pass. Everything is in head-local space:
+     translate to the head centre, rotate with the neck, then draw
+     at radius 1 and scale. That keeps the expression code readable
+     as expression code rather than as trigonometry. */
+  function drawFace(ctx, cx, cy, r, p, col) {
+    var f = p.face, turn = clamp01(p.turn);
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(cx, cy);
+    ctx.rotate(p.lean + p.headLag);
+    ctx.scale(r, r);
+    var ink = '#140d04';              // warm near-black, not pure black
+    ctx.fillStyle = ink;
+    ctx.strokeStyle = ink;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // As he turns to profile the features slide toward the near side
+    // and compress, and the far eye goes with the head.
+    var shift = turn * 0.30;
+    var squeeze = 1 - turn * 0.42;
+    var eyeGap = 0.36 * squeeze;
+    var eyeY = -0.10;
+    var open = clamp01(1 - f.blink);
+
+    function eye(dx, alpha) {
+      if (alpha <= 0.02) return;
+      ctx.save();
+      ctx.globalAlpha = p.alpha * alpha;
+      if (open < 0.25) {                      // blinking: a closed lid
+        ctx.lineWidth = 0.10;
+        ctx.beginPath();
+        ctx.moveTo(dx - 0.13, eyeY); ctx.lineTo(dx + 0.13, eyeY);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(dx, eyeY, 0.125, 0.150 * open, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    eye(shift - eyeGap, 1 - turn * 1.15);     // far eye, gone by full profile
+    eye(shift + eyeGap, 1);
+
+    // Brows carry most of the read: up = delight, down = effort.
+    if (Math.abs(f.brow) > 0.02) {
+      ctx.lineWidth = 0.085;
+      var by = eyeY - 0.30 - f.brow * 0.10;
+      var tilt = -f.brow * 0.16;
+      [[shift - eyeGap, 1 - turn * 1.15, 1], [shift + eyeGap, 1, -1]]
+        .forEach(function (E) {
+          if (E[1] <= 0.02) return;
+          ctx.save();
+          ctx.globalAlpha = p.alpha * E[1];
+          ctx.beginPath();
+          ctx.moveTo(E[0] - 0.14 * squeeze, by - tilt * E[2]);
+          ctx.lineTo(E[0] + 0.14 * squeeze, by + tilt * E[2]);
+          ctx.stroke();
+          ctx.restore();
+        });
+    }
+
+    // Mouth: an open O for effort, otherwise a curve whose sign is
+    // the difference between pleased and straining.
+    var mY = 0.30;
+    if (f.open > 0.02) {
+      ctx.beginPath();
+      ctx.ellipse(shift + turn * 0.10, mY, 0.17 * squeeze, 0.10 + 0.16 * f.open, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      var w = 0.32 * squeeze, curve = f.smile * 0.44;
+      ctx.lineWidth = 0.10;
+      ctx.beginPath();
+      ctx.moveTo(shift - w + turn * 0.08, mY);
+      ctx.quadraticCurveTo(shift + turn * 0.08, mY + curve, shift + w + turn * 0.08, mY);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   /* ---------- draw ------------------------------------------ */
   function render(ctx, p, H, col, groundY) {
     /* Contact shadow first: this is what puts him on a floor. It
@@ -178,6 +271,7 @@ window.Stickman = (function () {
 
     var out = null;
     for (var pass = 0; pass < 2; pass++) out = strokeFigure(ctx, p, H, col, pass);
+    drawFace(ctx, out.head[0], out.head[1], P.headR * H, p, col);
 
     ctx.restore();
     return out;
@@ -229,28 +323,38 @@ window.Stickman = (function () {
     ctx.beginPath();
     ctx.arc(hcx, hcy, P.headR * H, 0, Math.PI * 2);
     ctx.lineWidth = wide * 0.92;
+    if (pass) { ctx.fillStyle = col; ctx.fill(); }
     ctx.stroke();
 
     ctx.restore();
     return { foot: foot, hand: hand, head: [hcx, hcy] };
   }
 
-  /* ---------- the performance -------------------------------- */
+  function setFace(p, turn, smile, brow, open, blink) {
+    p.turn = turn;
+    p.face = { smile: smile, brow: brow || 0, open: open || 0, blink: blink || 0 };
+  }
+
+  /* ---------- the performance --------------------------------
+     Order matters as much as the poses: he kicks where the text is,
+     then walks to centre stage BEFORE turning to you. Looking down
+     the lens from off-centre reads as an accident; from the middle
+     of the frame it reads as address. */
   function build(t, C) {
     var H = C.H, ground = C.ground, p = pose();
     var kickX = C.kickX, midX = C.midX, stand = ground - LEG * H;
     p.hipY = stand;
 
-    /* 1 · walk in */
+    /* 1 · walk in — cheerful, on his way to do something about it */
     if (t < T.walkIn[1]) {
       var u = span(t, T.walkIn);
       p.hipX = lerp(C.startX, kickX, easeInOut(u));
-      walk(p, t * 0.0125, H, 1 - 0.55 * easeIn(u));   // decelerates into the kick
+      walk(p, t * 0.0125, H, 1 - 0.55 * easeIn(u));
+      setFace(p, 1, 0.40, 0.12, 0);
       return p;
     }
 
-    /* 2 · wind up — anticipation: he compresses and leans away
-           from the direction he is about to strike */
+    /* 2 · wind up — the smile drops, the brows come down */
     if (t < T.windUp[1]) {
       var w = easeOut(span(t, T.windUp));
       p.hipX = kickX;
@@ -262,10 +366,11 @@ window.Stickman = (function () {
       p.shoR = 0.56 * w; p.elbR = 0.36 * w;
       p.sq = 1 - 0.10 * w;
       p.hipY = stand + 0.035 * H * w;
+      setFace(p, 1, lerp(0.40, -0.15, w), lerp(0.12, -0.85, w), 0);
       return p;
     }
 
-    /* 3 · kick — releases into a stretch */
+    /* 3 · kick — mouth open on the effort */
     if (t < T.kick[1]) {
       var k = easeOut(span(t, T.kick));
       p.hipX = kickX + 0.045 * H * k;
@@ -279,10 +384,11 @@ window.Stickman = (function () {
       p.sq = 0.90 + 0.19 * k;
       p.hipY = stand + 0.035 * H - 0.055 * H * k;
       p.airborne = 0.25 * k;
+      setFace(p, 0.96, -0.2, -1, 0.55 + 0.45 * Math.sin(k * Math.PI));
       return p;
     }
 
-    /* 4 · recover — lands and settles, head arriving last */
+    /* 4 · recover — the effort resolves into a grin */
     if (t < T.recover[1]) {
       var r = span(t, T.recover), re = easeOut(r);
       p.hipX = kickX + 0.045 * H;
@@ -292,135 +398,156 @@ window.Stickman = (function () {
       p.hipR = -0.14 * (1 - re); p.kneeR = 0.28 * (1 - re);
       p.shoL = -1.24 * (1 - re); p.elbL = 0.12 + 0.40 * (1 - re);
       p.shoR = 1.28 * (1 - re); p.elbR = 0.12 + 0.24 * (1 - re);
-      p.sq = 1 - 0.14 * (1 - settle(r, 1)) ;     // impact squash, then settle
+      p.sq = 1 - 0.14 * (1 - settle(r, 1));
       p.hipY = stand - 0.02 * H * (1 - re);
+      setFace(p, 0.94, lerp(-0.2, 0.75, re), lerp(-1, 0.3, re), 0.5 * (1 - re));
       return p;
     }
 
-    /* 5 · appeal beat — brushes his hands together. Does nothing
-           for the plot; does everything for whether he reads as
-           somebody rather than something. */
-    if (t < T.brush[1]) {
-      var bph = span(t, T.brush);
-      var rub = Math.sin(bph * Math.PI * 3.1);
-      p.hipX = kickX + 0.045 * H;
-      p.shoL = 0.70 + rub * 0.16; p.elbL = -0.95;
-      p.shoR = -0.70 + rub * 0.16; p.elbR = 0.95;
-      p.lean = 0.05 + rub * 0.02;
-      p.headLag = -0.06 - rub * 0.03;
-      p.hipL = 0.10; p.hipR = -0.10; p.kneeL = 0.06; p.kneeR = 0.06;
-      p.sq = 1 + 0.015 * rub;
-      return p;
-    }
-
-    /* 6 · staging — he points at the top of the screen, one beat
-           before he goes for it, so the eye is already there */
-    if (t < T.point[1]) {
-      var pt = span(t, T.point), pe = easeOut(Math.min(1, pt * 1.5));
-      p.hipX = kickX + 0.045 * H;
-      p.shoL = lerp(0.70, Math.PI - 0.22, pe);
-      p.elbL = lerp(-0.95, 0, pe);
-      p.shoR = lerp(-0.70, -0.14, pe); p.elbR = lerp(0.95, 0.18, pe);
-      p.lean = 0.05 - 0.12 * pe;
-      p.headLag = -0.06 - 0.14 * pe;
-      p.hipL = 0.10; p.hipR = -0.10; p.kneeL = 0.06; p.kneeR = 0.06;
-      p.sq = 1 + 0.03 * pe;
-      return p;
-    }
-
-    /* 7 · stroll to the middle */
+    /* 5 · stroll to centre stage, pleased with himself */
     if (t < T.walkMid[1]) {
       var m = easeInOut(span(t, T.walkMid));
       p.hipX = lerp(kickX + 0.045 * H, midX, m);
       walk(p, t * 0.0125, H, 0.85);
+      setFace(p, 0.9, 0.75, 0.3, 0);
       return p;
     }
 
-    /* 8 · crouch — deep anticipation, the arms swing back */
+    /* 6 · turn — the head comes round to the lens, weight settles
+           onto both feet, hands drop to his sides */
+    if (t < T.turn[1]) {
+      var tn = easeOut(span(t, T.turn));
+      p.hipX = midX;
+      p.turn = 1 - tn;
+      p.hipL = 0.13 * (1 - tn * 0.4); p.kneeL = 0.07;
+      p.hipR = -0.13 * (1 - tn * 0.4); p.kneeR = 0.07;
+      p.shoL = 0.16 * tn; p.shoR = -0.16 * tn;
+      p.elbL = 0.10; p.elbR = -0.10;
+      p.lean = 0.05 * (1 - tn);
+      p.headLag = -0.05 * (1 - tn);
+      p.sq = 1 + 0.02 * Math.sin(tn * Math.PI);
+      p.face = { smile: lerp(0.75, 1, tn), brow: lerp(0.3, 0.55, tn), open: 0, blink: 0 };
+      return p;
+    }
+
+    /* 7 · hold — straight down the lens. He blinks once, breathes
+           once, and does nothing else. This beat is the character. */
+    if (t < T.hold[1]) {
+      var hd = span(t, T.hold);
+      p.hipX = midX;
+      p.turn = 0;
+      p.hipL = 0.08; p.kneeL = 0.07; p.hipR = -0.08; p.kneeR = 0.07;
+      p.shoL = 0.16; p.shoR = -0.16; p.elbL = 0.10; p.elbR = -0.10;
+      var breathe = Math.sin(hd * Math.PI * 1.6);
+      p.sq = 1 + 0.018 * breathe;
+      p.hipY = stand - 0.008 * H * breathe;
+      // one blink, 40% of the way in — enough to read as alive
+      var bl = Math.max(0, 1 - Math.abs(hd - 0.40) * 22);
+      p.face = { smile: 1, brow: 0.55, open: 0, blink: bl };
+      return p;
+    }
+
+    /* 8 · point — still mostly facing you, arm up to the top edge */
+    if (t < T.point[1]) {
+      var pt = easeOut(span(t, T.point));
+      p.hipX = midX;
+      p.turn = 0.22 * pt;
+      p.shoL = lerp(0.16, Math.PI - 0.20, pt); p.elbL = lerp(0.10, 0, pt);
+      p.shoR = -0.16; p.elbR = -0.10;
+      p.hipL = 0.08; p.kneeL = 0.07; p.hipR = -0.08; p.kneeR = 0.07;
+      p.lean = -0.10 * pt;
+      p.headLag = -0.16 * pt;
+      p.sq = 1 + 0.03 * pt;
+      setFace(p, p.turn, 0.9, 0.65, 0);
+      return p;
+    }
+
+    /* 9 · crouch */
     if (t < T.crouch[1]) {
       var c = easeInOut(span(t, T.crouch));
       p.hipX = midX;
-      p.hipL = 0.42 * c; p.kneeL = 0.86 * c;
-      p.hipR = 0.42 * c; p.kneeR = 0.86 * c;
-      p.shoL = -0.62 * c; p.shoR = -0.62 * c;
+      p.turn = 0.22;
+      p.hipL = lerp(0.08, 0.42, c); p.kneeL = lerp(0.07, 0.86, c);
+      p.hipR = lerp(-0.08, 0.30, c); p.kneeR = lerp(0.07, 0.86, c);
+      p.shoL = lerp(Math.PI - 0.20, -0.62, c); p.shoR = lerp(-0.16, -0.62, c);
       p.elbL = 0.12 + 0.52 * c; p.elbR = p.elbL;
       p.lean = 0.18 * c;
       p.headLag = -0.10 * c;
       p.sq = 1 - 0.20 * c;
       p.hipY = stand + 0.175 * H * c;
+      setFace(p, 0.22, lerp(0.9, 0.2, c), lerp(0.65, -0.55, c), 0);
       return p;
     }
 
-    /* 9 · jump — stretches off the floor, settles back to neutral
-           at the top of the arc */
+    /* 10 · jump */
     if (t < T.jump[1]) {
       var j = span(t, T.jump), je = easeOut(j);
       p.hipX = midX;
+      p.turn = 0.18;
       p.hipY = lerp(stand + 0.175 * H, C.apexHipY, je);
       p.shoL = lerp(-0.62, Math.PI, je); p.shoR = p.shoL;
       p.elbL = (0.12 + 0.52) * (1 - je); p.elbR = p.elbL;
       p.hipL = lerp(0.42, 0.22, je); p.kneeL = lerp(0.86, 0.55, je);
-      p.hipR = lerp(0.42, -0.16, je); p.kneeR = lerp(0.86, 0.30, je);
+      p.hipR = lerp(0.30, -0.16, je); p.kneeR = lerp(0.86, 0.30, je);
       p.lean = 0.18 * (1 - je);
       p.headLag = -0.10 + 0.16 * je;
-      p.sq = 1 + 0.26 * Math.sin(j * Math.PI) * (1 - j * 0.5);  // stretch, then neutral
+      p.sq = 1 + 0.26 * Math.sin(j * Math.PI) * (1 - j * 0.5);
       p.airborne = je;
-      p.shadow = 1;
+      setFace(p, 0.18, 0.1, -0.35, 0.45 + 0.4 * Math.sin(j * Math.PI));
       return p;
     }
 
-    /* 10 · catch — the edge gives under his weight, then holds */
+    /* 11 · grab — the edge gives under him, then holds */
     if (t < T.grab[1]) {
-      var ct = span(t, T.grab);
-      var give = Math.sin(ct * Math.PI) * 0.055 * H;
+      var ct = span(t, T.grab), jolt = Math.sin(ct * Math.PI);
       p.hipX = midX;
-      p._handY = C.apexHandY + give;
+      p._handY = C.apexHandY + jolt * 0.055 * H;
       p.hipY = p._handY + (ARM + P.torso) * H;
       grip(p);
-      var jolt = Math.sin(ct * Math.PI);
       p.hipL = 0.40 + 0.26 * jolt; p.kneeL = 0.92 + 0.20 * jolt;
       p.hipR = -0.26 - 0.10 * jolt; p.kneeR = 0.62 + 0.14 * jolt;
-      p.sq = 1 + 0.06 * Math.sin(ct * Math.PI);
+      p.sq = 1 + 0.06 * jolt;
       p.airborne = 1; p.shadow = 0.25;
+      setFace(p, 0.12, -0.3, -0.8, 0.5 * jolt);
       return p;
     }
 
-    /* 11 · pull — hands are pinned to the edge and the body hangs
-            off them. Solving downward from the hands instead of up
-            from the hips is what makes his weight look like the
-            thing moving the screen. */
+    /* 12 · pull — hands pinned to the edge, the body hanging off
+            them. Solving downward from the hands rather than up from
+            the hips is what makes his weight look like the thing
+            moving the screen. He is straining, and it shows. */
     if (t < T.pull[1]) {
       var q = span(t, T.pull);
       p._handY = lerp(C.apexHandY, C.vh, easeInOut(q));
       p.hipX = midX;
       p.hipY = p._handY + (ARM + P.torso) * H;
       grip(p);
-      // Legs trail and swing: the drag is doing something to him.
       var sw = Math.sin(q * Math.PI * 2.2) * (1 - q * 0.6) * 0.34;
       p.hipL = 0.40 + sw; p.kneeL = 0.92 + sw * 0.35;
       p.hipR = -0.26 + sw * 0.7; p.kneeR = 0.62 + sw * 0.3;
       p.lean = sw * 0.30;
       p.headLag = -sw * 0.40;
       p.airborne = 1; p.shadow = 0;
+      setFace(p, 0.08, -0.55, -0.95, 0.30);
       return p;
     }
 
-    /* 12 · hang — a beat dangling off the bottom before he lets go */
+    /* 13 · hang — it worked. He knows it worked. */
     if (t < T.hang[1]) {
-      var hgt = span(t, T.hang);
+      var hgt = span(t, T.hang), kk = Math.sin(hgt * Math.PI * 2.6) * 0.30 * (1 - hgt * 0.4);
       p._handY = C.vh;
       p.hipX = midX;
       p.hipY = C.vh + (ARM + P.torso) * H;
       grip(p);
-      var kk = Math.sin(hgt * Math.PI * 2.6) * 0.30 * (1 - hgt * 0.4);
       p.hipL = 0.40 + kk; p.kneeL = 0.92 - kk * 0.4;
       p.hipR = -0.26 - kk; p.kneeR = 0.62 + kk * 0.4;
       p.lean = kk * 0.2; p.headLag = -kk * 0.3;
       p.airborne = 1; p.shadow = 0;
+      setFace(p, 0, 0.85, 0.45, 0);
       return p;
     }
 
-    /* 13 · lets go */
+    /* 14 · lets go */
     var f = span(t, T.fall);
     p._handY = C.vh;
     p.hipX = midX;
@@ -429,10 +556,20 @@ window.Stickman = (function () {
     p.elbL = 0.32 * f; p.elbR = -0.32 * f;
     p.hipL = 0.40; p.kneeL = 0.92; p.hipR = -0.26; p.kneeR = 0.62;
     p.alpha = 1 - f; p.airborne = 1; p.shadow = 0;
+    setFace(p, 0, 1, 0.5, 0.35);
     return p;
   }
 
   /* ---------- runner ----------------------------------------- */
+  var active = null;
+
+  /* Abandon the performance. Whatever he had not got round to doing
+     still happens — the line still goes, the screen still comes all
+     the way down — because the page after a skip has to be the same
+     page as after a full watch. A skip that leaves a half-open blind
+     is a bug wearing a feature's clothes. */
+  function skip() { if (active) active(); }
+
   function run(opts) {
     opts = opts || {};
     var cvs = document.getElementById('stick');
@@ -482,9 +619,22 @@ window.Stickman = (function () {
       .getPropertyValue('--bone').trim() || '#f4f1e9';
 
     return new Promise(function (resolve) {
-      var t0 = 0, kicked = false;
+      var t0 = 0, kicked = false, done = false;
+
+      function finish(skipped) {
+        if (done) return;
+        done = true; active = null;
+        ctx.clearRect(0, 0, C.vw, C.vh);
+        window.removeEventListener('resize', measure);
+        if (!kicked && opts.onKick) { kicked = true; opts.onKick(); }
+        if (skipped && opts.onPull) opts.onPull(C.vh);
+        if (opts.onDone) opts.onDone(skipped);
+        resolve();
+      }
+      active = function () { finish(true); };
 
       function frame(now) {
+        if (done) return;
         if (!t0) t0 = now;
         var t = now - t0;
 
@@ -501,14 +651,8 @@ window.Stickman = (function () {
 
         render(ctx, p, C.H, col, C.ground);
 
-        if (t < END) {
-          requestAnimationFrame(frame);
-        } else {
-          ctx.clearRect(0, 0, C.vw, C.vh);
-          window.removeEventListener('resize', measure);
-          if (opts.onDone) opts.onDone();
-          resolve();
-        }
+        if (t < END) requestAnimationFrame(frame);
+        else finish(false);
       }
       requestAnimationFrame(frame);
     });
@@ -516,6 +660,7 @@ window.Stickman = (function () {
 
   return {
     run: run,
+    skip: skip,
     supported: function () { return !reduce && !!document.getElementById('stick'); },
     duration: END
   };
