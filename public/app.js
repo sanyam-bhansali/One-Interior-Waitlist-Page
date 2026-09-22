@@ -783,7 +783,7 @@
         // Everything goes: headline, line, perk, share block. The foot
         // is measured against .flead only because that is where the
         // text sits on screen — the whole block is what it clears.
-        FX.dissolve(finale, { duration: 700, hide: true });
+        FX.dissolve(finale, { duration: 520, hide: true });
       },
 
       onPull: function (handY) {

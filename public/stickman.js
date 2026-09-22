@@ -75,22 +75,28 @@ window.Stickman = (function () {
   var T = {
     fallIn:   [0, 520],       // drops in from above
     land:     [520, 900],     // impact, crumpled
-    getUp:    [900, 1440],
-    dust:     [1440, 2120],   // brushes himself off
-    turnCam:  [2120, 2440],
-    hold:     [2440, 3020],   // looks you in the eye. the charisma beat.
-    turnBack: [3020, 3240],   // squares up to the text
-    windUp:   [3240, 3520],
-    kick:     [3520, 3720],
-    impact:   3676,
-    recover:  [3720, 4000],
-    walkMid:  [4000, 4430],
-    crouch:   [4430, 4660],
-    jump:     [4660, 5070],
-    grab:     [5070, 5220],
-    pull:     [5220, 6290],
-    hang:     [6290, 6490],
-    fall:     [6490, 6900]
+    getUp:    [900, 1420],
+    dust:     [1420, 2020],   // brushes himself off
+    turnCam:  [2020, 2330],
+    hold:     [2330, 2870],   // looks you in the eye. the charisma beat.
+    turnBack: [2870, 3080],   // squares up to the text
+    windUp:   [3080, 3350],
+    kick:     [3350, 3550],
+    impact:   3508,
+    /* He holds here, off to the side, until the text has finished
+       scattering. He used to set off for centre stage while it was
+       still legible and walk straight across it — a figure occluding
+       the words it just destroyed reads as a z-index accident, not as
+       choreography. The dissolve is 520ms from impact (4028); he does
+       not move until 4080. */
+    recover:  [3550, 4080],
+    walkMid:  [4080, 4480],
+    crouch:   [4480, 4700],
+    jump:     [4700, 5100],
+    grab:     [5100, 5250],
+    pull:     [5250, 6300],
+    hang:     [6300, 6490],
+    fall:     [6490, 6890]
   };
   var END = T.fall[1];
 
