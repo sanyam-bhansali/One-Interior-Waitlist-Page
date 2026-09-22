@@ -65,7 +65,13 @@ window.OI_CONFIG = {
      assembles out of it.
      MP4 (H.264 + AAC), under ~8 MB, 1280x720 or 1920x1080.
   ------------------------------------------------------------- */
-  demoVideo: null,           // { src: "assets/demo.mp4", poster: "assets/demo-poster.jpg" }
+  demoVideo: { src: "assets/demo.mp4", poster: "assets/demo-poster.jpg" },
+
+  /* The finale gag: he walks on, kicks the closing line away and
+     pulls the screen down onto the demo film. Set false to go back
+     to a plain "See how it works" button. Visitors on
+     prefers-reduced-motion skip him automatically. */
+  stickman: true,
 
   /* ---- For studios -------------------------------------------
      The one link out of this page. Interior studios who hear about

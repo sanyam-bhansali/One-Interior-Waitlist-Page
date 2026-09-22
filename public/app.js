@@ -77,9 +77,24 @@
   var FX = (function () {
     var canvas = document.getElementById('fx');
     if (!canvas || reduce) {
+      // The still version of the real thing — and it has to honour the
+      // same contract, not just the visible half of it. It previously
+      // ignored `hidden`, so on reduced-motion the demo panel kept its
+      // hidden attribute, `.demo[hidden]{display:none}` won, and "See
+      // how it works" silently did nothing. Reduced motion means less
+      // movement, never fewer working buttons.
       return {
-        dissolve: function (el) { el.classList.remove('shown', 'up'); return Promise.resolve(); },
-        materialize: function (el, cls) { el.classList.add(cls || 'shown'); return Promise.resolve(); }
+        dissolve: function (el, opts) {
+          el.classList.remove('shown', 'up');
+          if (opts && opts.hide) el.hidden = true;
+          el.style.opacity = '';
+          return Promise.resolve();
+        },
+        materialize: function (el, cls) {
+          if (el.hidden) el.hidden = false;
+          el.classList.add(cls || 'shown');
+          return Promise.resolve();
+        }
       };
     }
 
@@ -447,7 +462,7 @@
   function step1() {
     var v = document.getElementById('inName').value.trim();
     if (v.length < 2) {
-      setError('inName', 'errName', 'We need a name to book your consultation under.');
+      setError('inName', 'errName', 'We\u2019ll need a name to book the consultation under.');
       return;
     }
     lead.name = v;
@@ -471,7 +486,7 @@
     var v = document.getElementById('inContact').value.trim();
     if (!(RE_EMAIL.test(v) || isIndianPhone(v))) {
       setError('inContact', 'errContact',
-        'That doesn’t look like a working number or email — check it and we’ll get your slot booked.');
+        'That doesn\u2019t look quite right \u2014 we need a working number or email to reach you on.');
       return;
     }
     lead.contact = v;
@@ -533,13 +548,14 @@
         return FX.materialize(finale, 'shown', { duration: 1150 });
       })
       .then(function () {
-        if (CFG.demoVideo && CFG.demoVideo.src) {
-          return wait(2100).then(function () {
-            var b = document.getElementById('demoBtn');
-            b.hidden = false;
-            return FX.materialize(b, 'shown', { duration: 700, count: 220 });
-          });
-        }
+        if (!(CFG.demoVideo && CFG.demoVideo.src)) return;
+        // Let them read the finale before anything happens to it.
+        return wait(2100).then(function () {
+          if (CFG.stickman !== false && window.Stickman && Stickman.supported()) return curtain();
+          var b = document.getElementById('demoBtn');
+          b.hidden = false;
+          return FX.materialize(b, 'shown', { duration: 700, count: 220 });
+        });
       })
       .catch(function (err) {
         setStage(3);
@@ -551,7 +567,7 @@
         formErr.hidden = false;
         formErr.textContent = (err && err.friendly)
           ? err.message
-          : 'That didn’t go through — check your connection and try once more. Your details are still here.';
+          : 'That didn\u2019t save \u2014 nothing\u2019s lost, your details are still here. Try once more?';
         CFG.track('waitlist_error', { message: String((err && err.message) || err) });
       });
   });
@@ -578,8 +594,8 @@
         return res.json().then(function (b) {
           var f = (b && b.fields) || [];
           var e = new Error(f.indexOf('contact') > -1
-            ? 'That number or email didn’t check out. Have another look?'
-            : 'Something in those details didn’t check out.');
+            ? 'That doesn\u2019t look quite right \u2014 we need a working number or email to reach you on.'
+            : 'Something there didn\u2019t come through. Have a quick look and try again?');
           e.friendly = true;
           throw e;
         });
@@ -618,9 +634,126 @@
 
     document.getElementById('demoClose').addEventListener('click', function () {
       vid.pause();
+      var flead = document.querySelector('.flead');
+      if (flead) flead.hidden = false;
+      var b = document.getElementById('demoBtn');
+      if (b && b.hidden) { b.hidden = false; b.classList.add('shown'); }
       FX.dissolve(demo, { duration: 800 })
         .then(function () { return wait(reduce ? 80 : 360); })
         .then(function () { return FX.materialize(finale, 'shown', { duration: 1000 }); });
+    });
+  }
+
+  /* ============================================================
+     WHY
+     Same dissolve grammar as the demo panel, so it feels native
+     rather than like a modal bolted on. Returns to the opening
+     untouched — the stage machine has not advanced, so the room
+     is exactly as it was left.
+     ============================================================ */
+  (function () {
+    var whyBtn = document.getElementById('whyBtn');
+    var why = document.getElementById('why');
+    var whyClose = document.getElementById('whyClose');
+    if (!whyBtn || !why || !whyClose) return;
+
+    var open = false;
+
+    function show() {
+      if (open) return; open = true;
+      CFG.track('why_open', {});
+      why.hidden = false;
+      document.body.classList.add('why-open');
+      FX.dissolve(opening, { duration: 760 })
+        .then(function () { opening.classList.add('gone'); return wait(reduce ? 80 : 340); })
+        .then(function () { return FX.materialize(why, 'shown', { duration: 1000 }); })
+        .then(function () { whyClose.focus({ preventScroll: true }); });
+    }
+
+    function hide() {
+      if (!open) return; open = false;
+      document.body.classList.remove('why-open');
+      FX.dissolve(why, { duration: 700 })
+        .then(function () { return wait(reduce ? 80 : 300); })
+        .then(function () {
+          // Must come off before materialize, or .gone's opacity:0 wins the
+          // moment the sweep clears its inline opacity.
+          opening.classList.remove('gone');
+          return FX.materialize(opening, 'shown', { duration: 900 });
+        })
+        .then(function () {
+          opening.classList.remove('shown');
+          why.hidden = true;
+          whyBtn.focus({ preventScroll: true });
+        });
+    }
+
+    whyBtn.addEventListener('click', show);
+    whyClose.addEventListener('click', hide);
+    // Escape is the reflex for anything that covers the screen.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && open) hide();
+    });
+  })();
+
+  /* ============================================================
+     CURTAIN
+     The stickman drives this: his foot decides when the line
+     dissolves, his hands decide where the screen edge is. This
+     function only translates those two events into page state, so
+     the timing lives entirely in stickman.js.
+     ============================================================ */
+  function curtain() {
+    var demoEl = document.getElementById('demo');
+    var vid = document.getElementById('demoVid');
+    var flead = document.querySelector('.flead');
+    var vh = window.innerHeight;
+
+    document.body.classList.add('curtain');
+    demoEl.hidden = false;
+    demoEl.classList.add('blind');
+    demoEl.style.transform = 'translateY(-101%)';   // 1% over, so no hairline gap
+
+    CFG.track('curtain_start', {});
+
+    return Stickman.run({
+      target: flead,
+
+      // hide:true retires the element in the same tick the sweep
+      // ends — otherwise clearing the inline opacity hands it back
+      // at full strength for one frame.
+      onKick: function () {
+        if (flead) FX.dissolve(flead, { duration: 620, hide: true });
+      },
+
+      onPull: function (handY) {
+        demoEl.style.transform = 'translateY(' + (handY - vh) + 'px)';
+      },
+
+      onDone: function () {
+        demoEl.style.transform = '';
+        demoEl.classList.remove('blind');
+        demoEl.classList.add('shown');
+        finale.classList.remove('shown');
+        document.body.classList.remove('curtain');
+        playDemo(vid);
+      }
+    });
+  }
+
+  /* Autoplay with sound is refused by every browser unless the gesture
+     is recent enough, and this lands ~8s after the submit click. Try
+     sound, accept silence, and say so rather than playing mute film at
+     someone who thinks it is broken. */
+  function playDemo(vid) {
+    vid.play().catch(function () {
+      vid.muted = true;
+      vid.play().then(function () {
+        var cap = document.querySelector('.demo .cap');
+        if (cap) cap.textContent = 'One Interiors — how it works · tap for sound';
+      }).catch(function () {
+        vid.controls = true;   // last resort: let them start it themselves
+      });
     });
   }
 

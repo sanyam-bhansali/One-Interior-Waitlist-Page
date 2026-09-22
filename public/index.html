@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>One Interiors — Join the Pune waitlist</title>
-<meta name="description" content="A curated marketplace of verified interior designers, launching first in Pune. Join the waitlist and get a free consultation with a certified architect.">
+<meta name="description" content="A curated marketplace of verified interior designers, launching first in Pune. Join the waitlist and get a free consultation with a registered architect.">
 <meta name="theme-color" content="#07090a">
 
 <!-- Link previews (WhatsApp, Instagram DMs, LinkedIn) -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="One Interiors — Join the Pune waitlist">
-<meta property="og:description" content="Verified designers, an instant quote, and a free consultation with a certified architect. Launching first in Pune.">
+<meta property="og:description" content="Verified designers, an instant quote, and a free consultation with a registered architect. Launching first in Pune.">
 <meta property="og:image" content="assets/og-room.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -251,8 +251,9 @@
     <button class="joinbtn" id="joinBtn" type="button">Join Waitlist</button>
     <p class="perk">
       <span class="dot"></span>
-      <span>Waitlist members get a free consultation with a certified architect</span>
+      <span>Waitlist members get a free consultation with a registered architect</span>
     </p>
+    <button class="why-link t-mono" id="whyBtn" type="button">Why we started this</button>
     <div class="hint t-mono">Move your cursor — the room is still dark</div>
   </div>
 
@@ -307,7 +308,7 @@
       <div class="step" id="s3" hidden>
         <div class="eyebrow t-mono">Step 3 of 3</div>
         <h2 class="t-title">Which of these feels like home?</h2>
-        <p class="sub">The room behind this card is already listening.</p>
+        <p class="sub">No wrong answer — it just tells us which studios to start with.</p>
         <div class="styles" role="group" aria-label="Style preference">
           <button class="chip" type="button" aria-pressed="false" data-style="warm">Warm Minimalist</button>
           <button class="chip" type="button" aria-pressed="false" data-style="modern">Modern Classic</button>
@@ -316,7 +317,7 @@
         </div>
         <button class="cta" id="submitBtn" type="submit" disabled>
           <span class="spin" aria-hidden="true"></span>
-          <span id="submitLabel">Claim my free consultation</span>
+          <span id="submitLabel">Put me on the list</span>
         </button>
         <div class="formerr" id="formErr" role="alert" hidden></div>
         <p class="cardperk">
@@ -341,13 +342,44 @@
     <button class="ghost" id="demoBtn" type="button" hidden>See how it works</button>
 
     <div class="share" id="shareBlock">
-      <span class="label t-mono">Know someone mid-renovation?</span>
+      <span class="label t-mono">Know someone who just got their keys?</span>
       <button class="ghost" id="shareBtn" type="button">Share the waitlist</button>
     </div>
   </div>
 
+  <!-- ===== Why ===== -->
+  <div class="why" id="why" hidden>
+    <div class="why-inner">
+      <div class="why-mark t-mono">Why we started this</div>
+
+      <h2 class="t-title">Everyone knows someone this went wrong for.</h2>
+
+      <p class="why-body">The advance that was paid and then nobody picked up. The
+      three-month job still unfinished in month nine. The final bill that looked nothing
+      like the first quote.</p>
+
+      <p class="why-turn">It shouldn't be this frightening to do up your own home.</p>
+
+      <p class="why-body">So we meet the studios before you ever do. We sit in homes they
+      finished, call the families who paid them, and look at the parts of the work that
+      don't photograph well. What we learn, you get to see — including the things a studio
+      would rather we left out.</p>
+
+      <p class="why-body">And on your first call, an architect sits on your side of the
+      table. Not to sell you anything. Just so that the first person explaining your own
+      home to you isn't someone hoping to be paid for it.</p>
+
+      <p class="why-last">You'll still choose. We just want it to be a safe choice.</p>
+
+      <button class="ghost" id="whyClose" type="button">Back to the room</button>
+    </div>
+  </div>
+
+  <canvas id="stick" aria-hidden="true"></canvas>
+
   <!-- ===== Demo ===== -->
   <div class="demo" id="demo" hidden>
+    <span class="demo-edge" aria-hidden="true"></span>
     <div class="demo-frame">
       <video id="demoVid" playsinline controls preload="none"></video>
     </div>
@@ -357,6 +389,7 @@
 </div>
 
 <script src="config.js"></script>
+<script src="stickman.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

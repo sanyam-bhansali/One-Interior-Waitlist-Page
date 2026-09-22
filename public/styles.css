@@ -418,7 +418,7 @@ button{font:inherit;color:inherit}
    DEMO PANEL
    ============================================================ */
 .demo{
-  position:absolute; inset:0; z-index:9; padding:28px;
+  position:absolute; inset:0; z-index:9; padding:clamp(14px,2.2vw,30px);
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
   opacity:0; pointer-events:none; visibility:hidden;
 }
@@ -429,12 +429,12 @@ button{font:inherit;color:inherit}
 }
 .demo > *{position:relative}
 .demo-frame{
-  width:min(920px,100%); border-radius:16px; overflow:hidden;
+  width:min(1240px,100%); border-radius:14px; overflow:hidden;
   border:1px solid rgba(244,241,233,.16);
   box-shadow:0 50px 120px -30px rgba(0,0,0,.9);
   background:#000; line-height:0;
 }
-.demo-frame video{width:100%; height:auto; display:block; max-height:72vh}
+.demo-frame video{width:100%; height:auto; display:block; max-height:82vh}
 .demo .cap{color:var(--bone-3); letter-spacing:var(--tr-hint); text-align:center}
 .demo[hidden]{display:none}
 
@@ -531,3 +531,114 @@ button{font:inherit;color:inherit}
   .forstudios span:first-child{ display:none; }
   .forstudios::before{ content:"Studios"; }
 }
+
+/* ============================================================
+   WHY  —  the one place on the page that isn't about the offer.
+   Reached from the opening, returns to it. Deliberately quiet:
+   warm, small, one column, read in under a minute.
+   ============================================================ */
+.why-link{
+  margin-top:22px; background:none; border:0; padding:6px 2px; cursor:pointer;
+  font-family:inherit; font-size:var(--fs-label); letter-spacing:var(--tr-hint);
+  text-transform:uppercase; color:var(--bone-3);
+  border-bottom:1px solid rgba(244,241,233,.16);
+  transition:color .4s ease, border-color .4s ease;
+}
+.why-link:hover,.why-link:focus-visible{ color:var(--bone-2); border-color:rgba(244,241,233,.4) }
+
+.why{
+  position:absolute; inset:0; z-index:10;
+  display:flex; align-items:center; justify-content:center;
+  padding:clamp(24px,5vw,56px) clamp(22px,6vw,48px);
+  opacity:0; pointer-events:none; visibility:hidden;
+}
+.why.shown{ opacity:1; pointer-events:auto; visibility:visible }
+.why[hidden]{ display:none }
+/* Deeper scrim than the demo panel: this is text, and it sits over a lit room. */
+.why::before{
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(120% 90% at 50% 45%, rgba(8,7,6,.86), rgba(8,7,6,.96));
+  backdrop-filter:blur(3px);
+}
+.why-inner{
+  position:relative; width:100%; max-width:36rem;
+  max-height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  text-align:left;
+}
+.why-mark{
+  font-size:var(--fs-label); letter-spacing:var(--tr-label); text-transform:uppercase;
+  color:var(--brass,#c9a227); margin-bottom:18px;
+}
+.why h2{
+  font-size:var(--fs-title); line-height:1.24; letter-spacing:var(--tr-title);
+  color:var(--bone); margin:0 0 20px; font-weight:300;
+}
+.why-body{
+  font-size:var(--fs-body); line-height:1.75; color:var(--bone-2); margin:0 0 16px;
+}
+/* The turn. Set apart because it's the sentence the rest of the page is missing. */
+.why-turn{
+  font-family:'Fraunces',Georgia,'Times New Roman',serif;
+  font-variation-settings:'SOFT' 0,'WONK' 0,'opsz' 144; font-weight:300;
+  font-size:clamp(18px,2vw,21px); line-height:1.4; letter-spacing:var(--tr-title);
+  color:var(--bone); margin:26px 0 24px; padding-left:18px;
+  border-left:1px solid rgba(201,162,39,.5);
+}
+.why-last{
+  font-size:var(--fs-lead); line-height:1.6; color:var(--bone);
+  margin:26px 0 0; padding-top:22px; border-top:1px solid rgba(244,241,233,.12);
+}
+.why .ghost{ margin-top:26px }
+
+@media (max-width:560px){
+  .why-inner{ max-height:calc(100% - 8px) }
+  .why-body{ line-height:1.7 }
+}
+/* Landscape phones: the panel is the only scrollable surface on the page. */
+@media (max-height:560px) and (orientation:landscape){
+  .why{ padding:18px 24px; align-items:flex-start }
+  .why-inner{ padding:14px 0 }
+  .why-turn{ margin:18px 0 16px }
+}
+
+/* The studio link outranks the why panel's scrim, and a recruitment CTA
+   competing with "everyone knows someone this went wrong for" is the wrong
+   note. Stand it down while the panel is open. */
+body.why-open .forstudios{ opacity:0; pointer-events:none }
+
+/* ============================================================
+   STICKMAN
+   Above the dust canvas (20) and the studio link (30): while he
+   is on stage he is the only thing anyone should be watching.
+   ============================================================ */
+#stick{
+  position:fixed; inset:0; width:100%; height:100%;
+  pointer-events:none; z-index:31;
+}
+
+/* While the blind is coming down the demo panel is a physical
+   object being dragged, not a modal fading in — so it must ignore
+   its own opacity transition and sit flat against the top edge. */
+.demo.blind{
+  opacity:1 !important; visibility:visible !important;
+  transition:none !important;
+  will-change:transform;
+}
+.demo.blind::before{ background:#0b0a09 }   /* opaque: it is a screen, not a scrim */
+
+/* The bottom edge. This is the part he is holding, so it needs
+   enough weight to look grabbable. */
+.demo-edge{
+  position:absolute; left:0; right:0; bottom:0; height:3px;
+  background:linear-gradient(90deg,
+    rgba(201,162,39,.25), rgba(201,162,39,.85) 18%,
+    rgba(201,162,39,.85) 82%, rgba(201,162,39,.25));
+  box-shadow:0 10px 30px rgba(0,0,0,.65), 0 1px 0 rgba(244,241,233,.22);
+  opacity:0; transition:opacity .25s ease;
+}
+.demo.blind .demo-edge{ opacity:1 }
+
+/* The finale is being kicked apart and covered; stop it catching
+   clicks the moment the blind starts moving. */
+body.curtain .finale{ pointer-events:none }
+body.curtain .forstudios{ opacity:0; pointer-events:none }
