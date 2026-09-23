@@ -722,6 +722,14 @@
     var vh = window.innerHeight;
     var showTimer = 0;
 
+    /* The film is ~9MB and the element is preload="none", so nothing
+       has been fetched yet. Start buffering NOW, at the top of the
+       curtain: the animation gives it ~7 seconds of head start, which
+       on a slow connection is the difference between the screen
+       coming down onto a film and onto a black rectangle. */
+    vid.preload = 'auto';
+    try { vid.load(); } catch (e) {}
+
     document.body.classList.add('curtain');
     demoEl.hidden = false;
     demoEl.classList.add('blind');
@@ -775,6 +783,7 @@
     return Stickman.run({
       target: flead,      // the line he stands on
       block: finale,      // the full width of what he has to clear
+      face: CFG.stickmanFace === true,
 
       // hide:true retires the element in the same tick the sweep
       // ends — otherwise clearing the inline opacity hands it back
@@ -802,11 +811,21 @@
      sound, accept silence, and say so rather than playing mute film at
      someone who thinks it is broken. */
   function playDemo(vid) {
+    vid.addEventListener('volumechange', function () {
+      if (!vid.muted) {
+        var cap = document.querySelector('.demo .cap');
+        if (cap) cap.classList.remove('on');
+      }
+    });
+
     vid.play().catch(function () {
       vid.muted = true;
       vid.play().then(function () {
         var cap = document.querySelector('.demo .cap');
-        if (cap) cap.textContent = 'One Interiors — how it works · tap for sound';
+        if (cap) {
+          cap.textContent = 'Muted by your browser — tap for sound';
+          cap.classList.add('on');
+        }
       }).catch(function () {
         vid.controls = true;   // last resort: let them start it themselves
       });

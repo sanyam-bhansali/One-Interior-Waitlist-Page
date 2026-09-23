@@ -440,17 +440,23 @@ button{font:inherit;color:inherit}
   width:100%; height:100%; max-height:none;
   object-fit:contain; display:block; background:#000;
 }
+/* The film carries its own titles now, so a caption naming it is
+   redundant — and at the bottom it landed straight on the player's
+   scrubber. It stays in the markup for one job only: telling someone
+   the sound was muted for them, which they cannot otherwise know. */
 .demo .cap{
-  position:absolute; left:0; right:0; bottom:18px; z-index:2;
-  color:var(--bone-3); letter-spacing:var(--tr-hint); text-align:center;
+  position:absolute; left:20px; top:22px; right:auto; z-index:2;
+  color:var(--bone-2); letter-spacing:var(--tr-hint); text-align:left;
   text-shadow:0 2px 12px rgba(0,0,0,.9); pointer-events:none;
+  opacity:0; transition:opacity .5s ease;
 }
+.demo .cap.on{ opacity:1 }
 .demo #demoClose{
   position:absolute; top:18px; right:18px; z-index:2; margin-top:0;
   background:rgba(8,7,6,.55); backdrop-filter:blur(6px);
 }
 @media (max-width:560px){
-  .demo .cap{ bottom:12px; font-size:var(--fs-label) }
+  .demo .cap{ left:12px; top:14px; font-size:var(--fs-label) }
   .demo #demoClose{ top:12px; right:12px; padding:9px 18px }
 }
 .demo[hidden]{display:none}

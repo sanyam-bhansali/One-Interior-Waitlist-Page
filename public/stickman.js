@@ -53,18 +53,32 @@ window.Stickman = (function () {
 
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  /* The character in the One Interiors film is blank — no eyes, no
+     mouth. A smiling figure on the page followed by a faceless one in
+     the film is two characters, not one, so the face is off by
+     default. config.js can turn it back on. */
+  var FACE = false;
+
   /* ---------- proportions ----------------------------------
      Fractions of standing height H, head-top to sole. Long-limbed
      and small-headed: a big round head reads as a cartoon, and
      this page is not a cartoon. */
   var P = {
-    headR: 0.098,   // roomy enough to carry eyes and a mouth
-    neck: 0.132,
-    torso: 0.250,
-    thigh: 0.230,
-    shin: 0.220,
-    upperArm: 0.200,
-    foreArm: 0.190
+    headRx: 0.070, headRy: 0.076,   // very nearly round, as in the film
+    neck: 0.122,
+    torso: 0.288,
+    thigh: 0.260,
+    shin: 0.250,
+    upperArm: 0.205,
+    foreArm: 0.195
+  };
+  /* Limb thicknesses, also fractions of H. Every limb tapers toward
+     its far end — that taper is most of what separates a mannequin
+     from a stick figure, more than the fill does. */
+  var R = {
+    shoulder: 0.038, elbow: 0.026, wrist: 0.017, hand: 0.022,
+    hip: 0.044, knee: 0.032, ankle: 0.019, foot: 0.021, footLen: 0.058,
+    torsoTop: 0.085, torsoBot: 0.068, neck: 0.026
   };
   var LEG = P.thigh + P.shin;
   var ARM = P.upperArm + P.foreArm;
@@ -288,15 +302,41 @@ window.Stickman = (function () {
     ctx.restore();
   }
 
-  /* ---------- draw ------------------------------------------ */
+  /* ---------- draw ------------------------------------------
+     The figure is filled, not stroked: a set of tapered capsules
+     painted white with a thin dark outline, matching the character
+     in the brand film. Each part is filled AND outlined in turn, so
+     where a limb crosses the body you see the edge of the limb —
+     which is what the film does, and what a single silhouette
+     outline could never give you. */
+
+  /* A capsule whose two ends have different radii. This is the whole
+     trick: the tangent lines between two circles, closed by the arc
+     on the far side of each. */
+  function taperPath(ctx, x1, y1, r1, x2, y2, r2) {
+    var dx = x2 - x1, dy = y2 - y1, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1e-4) {
+      ctx.beginPath();
+      ctx.arc(x1, y1, Math.max(r1, r2), 0, Math.PI * 2);
+      return;
+    }
+    var a = Math.atan2(dy, dx);
+    // If one circle contains the other there is no tangent; clamp.
+    var t = Math.acos(Math.max(-1, Math.min(1, (r1 - r2) / d)));
+    ctx.beginPath();
+    ctx.arc(x1, y1, r1, a + t, a - t);
+    ctx.arc(x2, y2, r2, a - t, a + t);
+    ctx.closePath();
+  }
+
   function render(ctx, p, H, col, groundY) {
     /* Contact shadow first: this is what puts him on a floor. It
        shrinks and fades as he leaves it, which is most of how the
        eye judges his height off the ground. */
     if (p.shadow > 0.01) {
       var lift = clamp01(p.airborne);
-      var rw = H * 0.30 * (1 - lift * 0.55) * (2 - p.sq);
-      var rh = H * 0.045 * (1 - lift * 0.5);
+      var rw = H * 0.26 * (1 - lift * 0.55) * (2 - p.sq);
+      var rh = H * 0.040 * (1 - lift * 0.5);
       ctx.save();
       ctx.globalAlpha = 0.42 * p.shadow * (1 - lift * 0.7) * p.alpha;
       ctx.fillStyle = '#000';
@@ -307,73 +347,91 @@ window.Stickman = (function () {
       ctx.restore();
     }
 
-    /* Squash and stretch, about the point he stands on, at
-       constant volume — wider as he gets shorter. */
+    /* Squash and stretch, about the point he stands on, at constant
+       volume — wider as he gets shorter. */
     ctx.save();
     var sy = p.sq, sx = 1 / Math.sqrt(sy);
     ctx.translate(p.hipX, groundY);
     ctx.scale(sx, sy);
     ctx.translate(-p.hipX, -groundY);
 
-    var out = null;
-    for (var pass = 0; pass < 2; pass++) out = strokeFigure(ctx, p, H, col, pass);
-    drawFace(ctx, out.head[0], out.head[1], P.headR * H, p, col);
+    var out = paintFigure(ctx, p, H, col);
+    if (FACE) drawFace(ctx, out.head[0], out.head[1], P.headRy * H * 0.92, p, col);
 
     ctx.restore();
     return out;
   }
 
-  function strokeFigure(ctx, p, H, col, pass) {
-    var lw = Math.max(3, H * 0.040);
-    var wide = pass ? lw : lw * 2.15;
-    ctx.save();
-    ctx.globalAlpha = p.alpha * (pass ? 1 : 0.42);
-    ctx.strokeStyle = pass ? col : '#070604';
-    ctx.lineWidth = wide;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+  function paintFigure(ctx, p, H, col) {
+    /* Each body part is drawn TWICE — once fattened in the outline
+       colour, once at true size in white — rather than filled and
+       stroked segment by segment. Stroking segments individually put
+       an outline around every upper arm and every thigh, so each
+       elbow and knee showed up as a ball joint and the figure read
+       as a wooden artist's model. Filling a whole limb in one pass
+       merges its segments seamlessly; the parts still outline
+       against each OTHER, which is what the film does. */
+    var OUT = 'rgba(16,11,3,.88)';
+    var ow = Math.max(1.2, H * 0.0095);
 
     var hx = p.hipX, hy = p.hipY;
-    var sx = hx - Math.sin(p.lean) * P.torso * H;
-    var sy = hy - Math.cos(p.lean) * P.torso * H;
+    var shx = hx - Math.sin(p.lean) * P.torso * H;
+    var shy = hy - Math.cos(p.lean) * P.torso * H;
+    var hcx = shx - Math.sin(p.lean + p.headLag) * P.neck * H;
+    var hcy = shy - Math.cos(p.lean + p.headLag) * P.neck * H;
+    // Toes point the way he faces; front-on they simply shorten.
+    var footLen = R.footLen * H * (0.35 + 0.65 * clamp01(p.turn));
 
-    function leg(hipA, kneeA) {
+    var lastFoot = null, lastHand = null;
+
+    function legPath(hipA, kneeA, pad) {
       var kn = tip(hx, hy, hipA, P.thigh * H);
-      var ft = tip(kn[0], kn[1], hipA - kneeA, P.shin * H);
-      ctx.beginPath();
-      ctx.moveTo(hx, hy); ctx.lineTo(kn[0], kn[1]); ctx.lineTo(ft[0], ft[1]);
-      ctx.stroke();
-      return ft;
+      var an = tip(kn[0], kn[1], hipA - kneeA, P.shin * H);
+      taperPath(ctx, hx, hy, R.hip * H + pad, kn[0], kn[1], R.knee * H + pad); ctx.fill();
+      taperPath(ctx, kn[0], kn[1], R.knee * H + pad, an[0], an[1], R.ankle * H + pad); ctx.fill();
+      taperPath(ctx, an[0], an[1], R.ankle * H + pad,
+                an[0] + footLen, an[1] + R.ankle * H * 0.55, R.foot * H + pad); ctx.fill();
+      lastFoot = an;
     }
-    function arm(shoA, elbA) {
-      var el = tip(sx, sy, shoA, P.upperArm * H);
-      var hd = tip(el[0], el[1], shoA + elbA, P.foreArm * H);
+    function armPath(shoA, elbA, pad) {
+      var el = tip(shx, shy, shoA, P.upperArm * H);
+      var wr = tip(el[0], el[1], shoA + elbA, P.foreArm * H);
+      taperPath(ctx, shx, shy, R.shoulder * H + pad, el[0], el[1], R.elbow * H + pad); ctx.fill();
+      taperPath(ctx, el[0], el[1], R.elbow * H + pad, wr[0], wr[1], R.wrist * H + pad); ctx.fill();
+      ctx.beginPath(); ctx.arc(wr[0], wr[1], R.hand * H + pad, 0, Math.PI * 2); ctx.fill();
+      lastHand = wr;
+    }
+    function torsoPath(pad) {
+      taperPath(ctx, shx, shy, R.torsoTop * H + pad, hx, hy, R.torsoBot * H + pad); ctx.fill();
+      taperPath(ctx, shx, shy, R.neck * H * 1.2 + pad, hcx, hcy, R.neck * H + pad); ctx.fill();
+    }
+    function headPath(pad) {
+      ctx.save();
+      ctx.translate(hcx, hcy);
+      ctx.rotate(p.lean + p.headLag);
       ctx.beginPath();
-      ctx.moveTo(sx, sy); ctx.lineTo(el[0], el[1]); ctx.lineTo(hd[0], hd[1]);
-      ctx.stroke();
-      return hd;
+      ctx.ellipse(0, 0, P.headRx * H + pad, P.headRy * H + pad, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
-    ctx.globalAlpha = p.alpha * (pass ? 0.55 : 0.42);
-    leg(p.hipR, p.kneeR);
-    arm(p.shoR, p.elbR);
-    ctx.globalAlpha = p.alpha * (pass ? 1 : 0.42);
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    function part(fn) {
+      ctx.fillStyle = OUT; fn(ow);
+      ctx.fillStyle = col; fn(0);
+    }
 
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(sx, sy); ctx.stroke();
-
-    var foot = leg(p.hipL, p.kneeL);
-    var hand = arm(p.shoL, p.elbL);
-
-    var hcx = sx - Math.sin(p.lean + p.headLag) * P.neck * H;
-    var hcy = sy - Math.cos(p.lean + p.headLag) * P.neck * H;
-    ctx.beginPath();
-    ctx.arc(hcx, hcy, P.headR * H, 0, Math.PI * 2);
-    ctx.lineWidth = wide * 0.92;
-    if (pass) { ctx.fillStyle = col; ctx.fill(); }
-    ctx.stroke();
-
+    // far side first, so the near limbs read in front of it
+    part(function (d) { legPath(p.hipR, p.kneeR, d); });
+    part(function (d) { armPath(p.shoR, p.elbR, d); });
+    part(torsoPath);
+    part(function (d) { legPath(p.hipL, p.kneeL, d); });
+    part(function (d) { armPath(p.shoL, p.elbL, d); });
+    part(headPath);          // last: the head is never behind anything
     ctx.restore();
-    return { foot: foot, hand: hand, head: [hcx, hcy] };
+
+    return { foot: lastFoot, hand: lastHand, head: [hcx, hcy] };
   }
 
   function setFace(p, turn, smile, brow, open, blink) {
@@ -691,6 +749,7 @@ window.Stickman = (function () {
 
   function run(opts) {
     opts = opts || {};
+    FACE = !!opts.face;
     var cvs = document.getElementById('stick');
     if (!cvs || reduce) {
       // No canvas, or the visitor asked for stillness. Deliver the

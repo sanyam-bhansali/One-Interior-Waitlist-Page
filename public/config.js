@@ -73,6 +73,12 @@ window.OI_CONFIG = {
      prefers-reduced-motion skip him automatically. */
   stickman: true,
 
+  /* The character in the brand film is blank — no eyes, no mouth.
+     The page figure matches it. Set true to give him a face again
+     (he has a full set of expressions either way; they are simply
+     not drawn). */
+  stickmanFace: false,
+
   /* ---- For studios -------------------------------------------
      The one link out of this page. Interior studios who hear about
      us land here like everybody else, and this is how they reach
