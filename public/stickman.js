@@ -63,22 +63,45 @@ window.Stickman = (function () {
      Fractions of standing height H, head-top to sole. Long-limbed
      and small-headed: a big round head reads as a cartoon, and
      this page is not a cartoon. */
+  /* Reconstructed from the supplied character SVG. Its pose is a
+     dynamic 3/4 one, so bone LENGTHS off the bounding box would be
+     foreshortened nonsense — instead the standing height is rebuilt
+     from the bones themselves (headR + neck + torso + thigh + shin =
+     875px in that file) and every ratio taken against that.
+     The headline correction: the head is half again bigger than I had
+     it by eye. That one number was doing most of the "not quite the
+     same character" work. */
   var P = {
-    headRx: 0.070, headRy: 0.076,   // very nearly round, as in the film
-    neck: 0.122,
-    torso: 0.288,
-    thigh: 0.260,
-    shin: 0.250,
-    upperArm: 0.205,
-    foreArm: 0.195
-  };
+    headRx: 0.110, headRy: 0.110,   // round; 96/876 in the source art
+    neck: 0.121,
+    torso: 0.344,
+    thigh: 0.207,
+    shin: 0.219,
+    upperArm: 0.198,
+    foreArm: 0.168
+  };   // these five sum to 1.001 — i.e. to the standing height
   /* Limb thicknesses, also fractions of H. Every limb tapers toward
      its far end — that taper is most of what separates a mannequin
      from a stick figure, more than the fill does. */
+  /* Half-widths, measured perpendicular to each bone in the source
+     art. The limbs taper far less than I had assumed — a forearm and
+     a shin are near enough the same thickness end to end, and the
+     wrists and ankles are thicker than I was drawing them. */
+  /* Every one of these came out of a distance transform of the source
+     art — the largest circle that fits inside each limb, which needs
+     no joint estimates and no angles and so cannot be fudged.
+
+     Two corrections worth naming. The limbs taper far less than I had
+     assumed; a forearm is nearly the same thickness at both ends. And
+     the torso is NARROW at the shoulders and WIDE at the hips, which
+     is the opposite of the way I had drawn it — the arms on this
+     character hang off a narrow yoke close to the neck. */
   var R = {
-    shoulder: 0.038, elbow: 0.026, wrist: 0.017, hand: 0.022,
-    hip: 0.044, knee: 0.032, ankle: 0.019, foot: 0.021, footLen: 0.058,
-    torsoTop: 0.085, torsoBot: 0.068, neck: 0.026
+    shoulder: 0.046, elbow: 0.036, wrist: 0.031,
+    hip: 0.042, knee: 0.034, ankle: 0.029,
+    torsoTop: 0.058, torsoBot: 0.072, neck: 0.046,
+    handLen: 0.058, handW: 0.036, thumb: 0.019,
+    footLen: 0.078, footW: 0.036
   };
   var LEG = P.thigh + P.shin;
   var ARM = P.upperArm + P.foreArm;
@@ -377,32 +400,75 @@ window.Stickman = (function () {
     var hx = p.hipX, hy = p.hipY;
     var shx = hx - Math.sin(p.lean) * P.torso * H;
     var shy = hy - Math.cos(p.lean) * P.torso * H;
+
+    /* Both arms used to hang from one point at the centre of the
+       chest. In profile that is invisible; front-on — which is the
+       beat where he looks at you, the one that has to land — it put
+       both arms out of the middle of his sternum. Shoulders and hips
+       now spread apart as he turns to face us and close back to a
+       single point in profile, which is exactly what they do in a
+       real 3/4 turn. */
+    var px = Math.cos(p.lean), py = -Math.sin(p.lean);   // across the shoulders
+    var spreadS = R.torsoTop * H * 0.95 * (1 - clamp01(p.turn));
+    var spreadH = R.torsoBot * H * 0.60 * (1 - clamp01(p.turn));
     var hcx = shx - Math.sin(p.lean + p.headLag) * P.neck * H;
     var hcy = shy - Math.cos(p.lean + p.headLag) * P.neck * H;
     // Toes point the way he faces; front-on they simply shorten.
-    var footLen = R.footLen * H * (0.35 + 0.65 * clamp01(p.turn));
+    var footLen = R.footLen * H * (0.40 + 0.60 * clamp01(p.turn));
 
     var lastFoot = null, lastHand = null;
 
-    function legPath(hipA, kneeA, pad) {
-      var kn = tip(hx, hy, hipA, P.thigh * H);
+    function legPath(hipA, kneeA, pad, side) {
+      var hx0 = hx + px * spreadH * side, hy0 = hy + py * spreadH * side;
+      var kn = tip(hx0, hy0, hipA, P.thigh * H);
       var an = tip(kn[0], kn[1], hipA - kneeA, P.shin * H);
-      taperPath(ctx, hx, hy, R.hip * H + pad, kn[0], kn[1], R.knee * H + pad); ctx.fill();
+      taperPath(ctx, hx0, hy0, R.hip * H + pad, kn[0], kn[1], R.knee * H + pad); ctx.fill();
       taperPath(ctx, kn[0], kn[1], R.knee * H + pad, an[0], an[1], R.ankle * H + pad); ctx.fill();
+      /* A wedge, not a blob: the source art's foot runs out from the
+         ankle and narrows to a near-point at the toe. */
       taperPath(ctx, an[0], an[1], R.ankle * H + pad,
-                an[0] + footLen, an[1] + R.ankle * H * 0.55, R.foot * H + pad); ctx.fill();
+                an[0] + footLen, an[1] + R.ankle * H * 0.75,
+                R.footW * H * 0.42 + pad); ctx.fill();
       lastFoot = an;
     }
-    function armPath(shoA, elbA, pad) {
-      var el = tip(shx, shy, shoA, P.upperArm * H);
+    function armPath(shoA, elbA, pad, side) {
+      var sx0 = shx + px * spreadS * side, sy0 = shy + py * spreadS * side;
+      var el = tip(sx0, sy0, shoA, P.upperArm * H);
       var wr = tip(el[0], el[1], shoA + elbA, P.foreArm * H);
-      taperPath(ctx, shx, shy, R.shoulder * H + pad, el[0], el[1], R.elbow * H + pad); ctx.fill();
+      taperPath(ctx, sx0, sy0, R.shoulder * H + pad, el[0], el[1], R.elbow * H + pad); ctx.fill();
       taperPath(ctx, el[0], el[1], R.elbow * H + pad, wr[0], wr[1], R.wrist * H + pad); ctx.fill();
-      ctx.beginPath(); ctx.arc(wr[0], wr[1], R.hand * H + pad, 0, Math.PI * 2); ctx.fill();
+      /* The hand is a flat paddle carried on along the forearm, with a
+         thumb spur off the inside edge — not the circle I had. It is
+         one of the most recognisable things about this character and
+         it was the most wrong. */
+      var fa = shoA + elbA;
+      ctx.save();
+      ctx.translate(wr[0], wr[1]);
+      // local +x now runs along the forearm, away from the elbow
+      ctx.rotate(Math.atan2(Math.cos(fa), Math.sin(fa)));
+      var hl = R.handLen * H, hw = R.handW * H;
+      ctx.beginPath();
+      ctx.ellipse(hl * 0.42, 0, hl * 0.52 + pad, hw + pad, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(hl * 0.16, -hw * 0.92, R.thumb * H + pad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       lastHand = wr;
     }
     function torsoPath(pad) {
       taperPath(ctx, shx, shy, R.torsoTop * H + pad, hx, hy, R.torsoBot * H + pad); ctx.fill();
+      // cap the spread so the yoke and pelvis stay one solid mass
+      if (spreadS > 0.5) {
+        taperPath(ctx, shx - px * spreadS, shy - py * spreadS,
+                  R.shoulder * H + pad, shx + px * spreadS, shy + py * spreadS,
+                  R.shoulder * H + pad); ctx.fill();
+      }
+      if (spreadH > 0.5) {
+        taperPath(ctx, hx - px * spreadH, hy - py * spreadH,
+                  R.hip * H * 0.9 + pad, hx + px * spreadH, hy + py * spreadH,
+                  R.hip * H * 0.9 + pad); ctx.fill();
+      }
       taperPath(ctx, shx, shy, R.neck * H * 1.2 + pad, hcx, hcy, R.neck * H + pad); ctx.fill();
     }
     function headPath(pad) {
@@ -423,11 +489,11 @@ window.Stickman = (function () {
     }
 
     // far side first, so the near limbs read in front of it
-    part(function (d) { legPath(p.hipR, p.kneeR, d); });
-    part(function (d) { armPath(p.shoR, p.elbR, d); });
+    part(function (d) { legPath(p.hipR, p.kneeR, d, -1); });
+    part(function (d) { armPath(p.shoR, p.elbR, d, -1); });
     part(torsoPath);
-    part(function (d) { legPath(p.hipL, p.kneeL, d); });
-    part(function (d) { armPath(p.shoL, p.elbL, d); });
+    part(function (d) { legPath(p.hipL, p.kneeL, d, 1); });
+    part(function (d) { armPath(p.shoL, p.elbL, d, 1); });
     part(headPath);          // last: the head is never behind anything
     ctx.restore();
 
