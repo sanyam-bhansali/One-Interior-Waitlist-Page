@@ -1,150 +1,147 @@
-# Waitlist storage — Supabase
+# Where waitlist signups go
 
-Fifteen minutes, once. After this every signup lands in a table you can query,
-export and count, instead of an inbox.
-
----
-
-## 1 · Create the table
-
-Supabase → your project → **SQL Editor** → **New query**. Paste the whole of
-[`supabase/schema.sql`](../supabase/schema.sql) and press **Run**.
-
-It is safe to run twice — every statement is guarded.
-
-You should see `Success. No rows returned`. Check **Table Editor**: a
-`waitlist` table, empty, with a padlock next to it. The padlock is the point.
+Into the **One Interiors product database** — the same Supabase project as
+everything else — so ops sees the waitlist at `/ops/waitlist` beside
+applications, verification and the funnel.
 
 ---
 
-## 2 · Get the keys
+## The shape of it
 
-Supabase → **Project Settings** → **API**. You need two values:
+```
+oneinteriors.in (this repo)
+        │  POST, Bearer WAITLIST_INGEST_TOKEN
+        ▼
+One Interiors app  ·  POST /api/waitlist
+        │  Prisma
+        ▼
+Postgres  ·  waitlist_signups    →    /ops/waitlist
+```
+
+**This page holds a bearer token, not a database credential, and that is the
+whole design.** A Supabase `service_role` key would let a marketing landing
+page read every user, brief and quote in the product. A token scoped to one
+route lets it add a name to one table. If it ever leaks, that is the entire
+blast radius.
+
+---
+
+## Setup
+
+### 1 · Generate a token
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+### 2 · Product project (OneInteriors)
+
+Add the model and migrate — this is a Prisma repo, so the table must come from
+a migration, never from SQL typed into Supabase. An unmanaged table shows up
+as schema drift and the next `migrate` will offer to reset it.
+
+```bash
+npm run db:migrate      # creates waitlist_signups
+```
+
+Then in **its** Vercel project → Settings → Environment Variables:
+
+```
+WAITLIST_INGEST_TOKEN   <the token>
+```
+
+### 3 · This project
+
+Vercel → Settings → Environment Variables:
+
+```
+ONE_INTERIORS_INGEST_URL   https://oneinteriors.in/api/waitlist
+WAITLIST_INGEST_TOKEN      <the same token>
+```
+
+Redeploy **both**. Environment variables are read at boot, so an existing
+deployment will not pick them up on its own.
+
+### 4 · Check
+
+Join the waitlist on the live page, then open `/ops/waitlist`. The row should
+be there, tagged with whichever share link you used.
+
+---
+
+## Tracking which societies worked
+
+The campaign is one WhatsApp message per society group. Give each its own link:
+
+```
+oneinteriors.in/?s=baner-greens
+oneinteriors.in/?s=kothrud-orchid
+```
+
+The tag is captured, sanitised on both sides, stored on the row, and totalled
+on the ops page under **Where they came from**. Without a tag the row reads
+`no tag`.
+
+This is the only way to know which groups are worth a second push.
+
+---
+
+## What the visitor is told
+
+At the moment they type their number:
+
+> We'll use your number to tell you when we go live, and to book your free
+> architect consultation. Nothing else, and never passed on.
+
+Every row stores the `policyVersion` that was in force when they agreed —
+`POLICY_VERSION` in `src/modules/consent/policy.ts`. That is the same rule the
+product's `Consent` model already follows, and it exists because **consent does
+not survive a material change to the wording.** If that sentence above changes
+in substance, bump `POLICY_VERSION`; rows stamped with the old one no longer
+represent agreement to the new text.
+
+---
+
+## Behaviour
+
+**Duplicates collapse.** The phone is normalised to E.164 by the same function
+the product uses, and the column is unique — so a second signup updates the
+existing row rather than adding another. `createdAt` keeps the first time they
+joined. The total gets quoted to studios, so it has to mean people.
+
+**Storage and notification are different things.** If `WAITLIST_WEBHOOK_URL`
+or `WEB3FORMS_KEY` is also set, it is a *ping*. A lead safely in Postgres is
+not reported as failed because Zapier was down — that would only make the
+visitor submit again and leave you holding the same person twice. With no
+ingest URL configured, the notifier becomes the store and its failure does
+fail the request.
+
+**Nothing disappears quietly.** If the ingest call fails, the whole lead is
+written to the Vercel function log and can be recovered by hand.
+
+---
+
+## Phone numbers
+
+Both ends accept the same forms, because they run the same rule:
 
 | | |
 |---|---|
-| **Project URL** | `https://xxxxxxxx.supabase.co` |
-| **service_role** key | the long one under "Project API keys", marked `secret` |
+| `9822011234` | ✅ |
+| `+91 98220 11234` | ✅ |
+| `09822011234` | ✅ — the STD-dialling habit, and very common on business cards |
+| `919822011234` | ✅ |
+| `020 2567 8900` | ❌ Pune landline — nothing can message it |
 
-**Take the `service_role` key, not the `anon` key.** They look almost
-identical and swapping them is the single most common way waitlist tables get
-leaked — `anon` is designed to be public and would fail against this table
-anyway, since RLS blocks it.
-
----
-
-## 3 · Put them in Vercel
-
-Vercel → your project → **Settings** → **Environment Variables**. Add two,
-ticking **Production**, **Preview** and **Development**:
-
-```
-SUPABASE_URL                https://xxxxxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY   eyJhbGciOi…            (the service_role one)
-```
-
-Then **Deployments → ⋯ → Redeploy**. Environment variables are read at boot,
-so an existing deployment will not pick them up on its own.
+The leading-zero form used to be rejected here. `src/modules/studio/phone.ts`
+in the product repo records what that cost on the studio side: people typing
+their own number correctly were told it was wrong, and those signups never
+reached anybody to be counted.
 
 ---
 
-## 4 · Check it works
+## If the token leaks
 
-Open the live site, join the waitlist with a real number, then look in
-Supabase → **Table Editor** → `waitlist`. Your row should be there within a
-second or two.
-
-If it is not, Vercel → **Deployments** → the latest → **Functions** →
-`api/waitlist` shows the log. The function prints the exact PostgREST error,
-so you get "relation does not exist" or "Invalid API key" rather than having
-to guess.
-
-**Nothing is lost while you debug.** If the insert fails, the whole lead is
-written to the function log, so it can be recovered by hand.
-
----
-
-## 5 · Reading it
-
-There are ready-made queries at the bottom of `supabase/schema.sql`. The one
-you will use most is the campaign scoreboard:
-
-```sql
-select coalesce(nullif(via, ''), '(direct)') as came_from,
-       count(*) as signups,
-       max(created_at) as latest
-from public.waitlist
-group by 1
-order by signups desc;
-```
-
-`via` is filled from the share link — `oneinteriors.in/?s=baner-greens` stores
-`baner-greens`. Give every society its own tag and this table tells you which
-WhatsApp groups actually worked. Without the tag the column reads `(direct)`.
-
-To export for calling: **Table Editor** → `waitlist` → **Export** → CSV.
-
----
-
-## How the pieces fit
-
-```
-browser  →  /api/waitlist  →  Supabase  (the store of record)
-                           ↘  webhook / email  (optional ping)
-```
-
-- **Supabase is the store.** If the insert fails the visitor sees an error and
-  the lead is in the logs.
-- **A webhook is only a notification.** If Zapier is down but the row is safely
-  in Postgres, the visitor still sees success — telling them it failed would
-  only make them submit again and you would have the same lead twice.
-- With **no** Supabase configured, whichever notifier is set becomes the store
-  and its failure does fail the request.
-- With **nothing** configured the route runs in preview mode: validates, logs,
-  stores nothing.
-
-## Duplicates
-
-Someone joining twice updates their existing row rather than adding a second.
-The key is a normalised contact, so `9822011234`, `+91 98220 11234` and
-`+919822011234` are recognised as one person. `created_at` keeps the first
-time they joined; everything else takes the newest values.
-
-This is worth having because the row count is a number you will quote to
-studios and investors, and it should mean "people", not "form submissions".
-
----
-
-## Two things to decide before launch
-
-**1 · There is no privacy notice on the page.** You are collecting names and
-phone numbers from Indian residents, which the DPDP Act 2023 covers, and it
-requires telling people what you are collecting and why. One line under the
-submit button is enough to be straight with people:
-
-> We'll use your number only to book your consultation. Nothing else, no
-> sharing.
-
-Say the word and I'll add it — it's one line of copy and a link.
-
-**2 · The IP address column.** `ip` and `user_agent` are stored for spotting a
-bot flood from one address. They are also personal data, and you may prefer
-not to hold them at all. To drop them:
-
-```sql
-alter table public.waitlist drop column ip, drop column user_agent;
-```
-
-and delete the two matching lines from the `lead` object in `api/waitlist.js`.
-Everything else keeps working.
-
----
-
-## If the key ever leaks
-
-Supabase → **Settings** → **API** → **Reset** the `service_role` key, then
-update `SUPABASE_SERVICE_ROLE_KEY` in Vercel and redeploy. The old key stops
-working immediately.
-
-Because RLS is on with no policies, a leaked **anon** key is harmless against
-this table — it can neither read nor write. Only `service_role` matters.
+Generate a new one, set it in both projects, redeploy both. The old token
+stops working the moment the product redeploys. Nothing else is exposed —
+the token cannot read the table, only add to it.

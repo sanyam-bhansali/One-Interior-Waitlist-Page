@@ -441,8 +441,25 @@
      VALIDATION
      ============================================================ */
   var RE_EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
+  /* Kept deliberately identical to normalisePhone() in the product repo
+     (src/modules/studio/phone.ts). That file records what a narrower version
+     of this rule already cost: "09876543210" is one of the two commonest ways
+     an Indian writes a mobile — the habit is left over from STD dialling and
+     it is on a great many business cards — and rejecting it told people
+     typing their own number correctly that it was wrong. Those signups never
+     reached anybody to be counted.
+
+     Dropping ONE zero and re-testing is deliberately narrow: "020 2567 8900"
+     is also eleven digits with a leading zero, and it is a Pune landline. It
+     strips to 2025678900, fails the 6-9 rule, and is still refused — rightly,
+     because nothing can send a message to it. */
   function isIndianPhone(v) {
-    return /^[6-9]\d{9}$/.test(String(v).replace(/[\s\-()]/g, '').replace(/^\+?91/, ''));
+    var d = String(v == null ? '' : v).replace(/\D/g, '');
+    if (d.length === 10 && /^[6-9]/.test(d)) return true;
+    if (d.length === 11 && d.charAt(0) === '0' && /^[6-9]/.test(d.slice(1))) return true;
+    if (d.length === 12 && d.slice(0, 2) === '91' && /^[6-9]/.test(d.slice(2))) return true;
+    if (d.length === 13 && d.slice(0, 3) === '091' && /^[6-9]/.test(d.slice(3))) return true;
+    return false;
   }
   function setError(inputId, errId, message) {
     var input = document.getElementById(inputId);
