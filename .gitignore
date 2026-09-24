@@ -14,3 +14,6 @@ source/
 
 # Scratch
 *.log
+
+# Marketing cuts — regenerable from source/, no need in the repo
+share/

@@ -572,10 +572,24 @@
       });
   });
 
+  /* Where this visitor came from. One link per society — oneinteriors.in/?s=baner-greens —
+     is the only way to know which groups actually worked; without this the page
+     reads the tag and throws it away, and every lead looks identical. */
+  function referrerTag() {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      var v = q.get('s') || q.get('src') || q.get('utm_source') || '';
+      // whitelist, not blacklist: this string ends up in someone's inbox
+      v = String(v).trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48);
+      return v || null;
+    } catch (e) { return null; }
+  }
+
   function buildPayload() {
     return {
       name: lead.name, contact: lead.contact, style: lead.style,
       city: CFG.city, source: 'waitlist-landing',
+      via: referrerTag(),
       submittedAt: new Date().toISOString()
     };
   }

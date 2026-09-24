@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   }
 
   const body = typeof req.body === 'string' ? safeParse(req.body) : (req.body || {});
-  const { name, contact, style, city, company } = body;
+  const { name, contact, style, city, company, via } = body;
 
   // Honeypot. Bots fill hidden fields; people don't. Answer 200 so they
   // don't learn they were caught and retry with it blank.
@@ -44,6 +44,9 @@ export default async function handler(req, res) {
     style: style || '',
     city: city || 'Pune',
     source: 'waitlist-landing',
+    // Which society group / share link this lead came in through, if any.
+    // Re-sanitised here: never trust a value that arrived from the browser.
+    via: via ? String(via).toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48) : '',
     submittedAt: new Date().toISOString(),
     // Useful for spotting bot floods from one address. Not stored anywhere else.
     ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
