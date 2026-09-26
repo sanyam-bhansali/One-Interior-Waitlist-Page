@@ -9,7 +9,10 @@
  * Into the One Interiors product database, through its own ingest route, so
  * that ops sees the waitlist beside everything else at /ops/waitlist.
  *
- *   ONE_INTERIORS_INGEST_URL   https://oneinteriors.in/api/waitlist
+ *   ONE_INTERIORS_INGEST_URL   https://ops.oneinteriors.in/api/waitlist
+ *                              NOT oneinteriors.in — that host is this very
+ *                              page, and pointing at it makes this function
+ *                              POST to itself.
  *   WAITLIST_INGEST_TOKEN      the same secret set in the product project
  *
  * This page holds a bearer token, NOT a database credential, and the

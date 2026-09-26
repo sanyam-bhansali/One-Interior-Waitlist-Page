@@ -9,10 +9,10 @@ applications, verification and the funnel.
 ## The shape of it
 
 ```
-oneinteriors.in (this repo)
+oneinteriors.in (this repo — the waitlist page)
         │  POST, Bearer WAITLIST_INGEST_TOKEN
         ▼
-One Interiors app  ·  POST /api/waitlist
+ops.oneinteriors.in  ·  POST /api/waitlist   (the product app)
         │  Prisma
         ▼
 Postgres  ·  waitlist_signups    →    /ops/waitlist
@@ -55,7 +55,7 @@ WAITLIST_INGEST_TOKEN   <the token>
 Vercel → Settings → Environment Variables:
 
 ```
-ONE_INTERIORS_INGEST_URL   https://oneinteriors.in/api/waitlist
+ONE_INTERIORS_INGEST_URL   https://ops.oneinteriors.in/api/waitlist
 WAITLIST_INGEST_TOKEN      <the same token>
 ```
 
