@@ -102,8 +102,18 @@ window.OI_CONFIG = {
      Fires at waitlist_open, waitlist_step, waitlist_style,
      waitlist_submit, waitlist_error, waitlist_share.
   ------------------------------------------------------------- */
+  /* Every milestone on the page calls this — opening the form, each step,
+     the style pick, submit, errors, the film, the skip, the share. Thirteen
+     events, which is a funnel rather than a pageview count.
+
+     The guard matters: gtag is absent whenever an ad blocker ate the script,
+     and roughly a third of people run one. An unguarded call would throw
+     inside the submit handler and lose the signup — analytics must never be
+     able to break the form it is measuring. */
   track: function (event, data) {
-    // window.gtag && gtag('event', event, data);
+    try {
+      if (window.gtag) gtag('event', event, data || {});
+    } catch (e) { /* never let measurement break the page */ }
     // window.plausible && plausible(event, { props: data });
   }
 };

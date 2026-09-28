@@ -3,6 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Google tag (gtag.js) — GA4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Y451K5CT0R"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  /* The society tag from ?s=baner-greens, attached to every hit for this
+     visitor rather than to one event. The whole campaign is one WhatsApp
+     message per society, so "which society" has to be a property of the
+     SESSION — otherwise it only ever lands on the pageview and no funnel
+     step can be segmented by it. */
+  var oiVia = null;
+  try {
+    var q = new URLSearchParams(location.search);
+    oiVia = (q.get('s') || q.get('src') || q.get('utm_source') || '')
+      .trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48) || null;
+  } catch (e) {}
+
+  gtag('config', 'G-Y451K5CT0R', oiVia ? { via: oiVia } : {});
+  if (oiVia) gtag('set', 'user_properties', { via: oiVia });
+</script>
+
 <title>One Interiors — Join the Pune waitlist</title>
 <meta name="description" content="A curated marketplace of verified interior designers, launching first in Pune. Join the waitlist and get a free consultation with a registered architect.">
 <meta name="theme-color" content="#07090a">
