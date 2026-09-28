@@ -1,0 +1,8 @@
+# One Interiors — oneinteriors.in
+User-agent: *
+Allow: /
+
+# The waitlist API takes POSTs only; nothing there to crawl.
+Disallow: /api/
+
+Sitemap: https://oneinteriors.in/sitemap.xml
