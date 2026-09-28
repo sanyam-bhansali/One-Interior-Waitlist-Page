@@ -90,8 +90,15 @@ export default async function handler(req, res) {
     submittedAt: new Date().toISOString()
   };
 
-  const ingestUrl = process.env.ONE_INTERIORS_INGEST_URL;
-  const ingestToken = process.env.WAITLIST_INGEST_TOKEN;
+  /* Trimmed, and this is not a nicety. The product side trims the value it
+     reads from its own environment, so a token pasted into Vercel with a
+     trailing newline or space — which is what copying out of a terminal
+     usually gives you — arrives here a character longer than the one it is
+     compared against, fails on length, and comes back 401. Two projects
+     disagreeing about whitespace in the same secret is unfindable from the
+     outside: the endpoint simply says "Not for you." */
+  const ingestUrl = (process.env.ONE_INTERIORS_INGEST_URL || '').trim();
+  const ingestToken = (process.env.WAITLIST_INGEST_TOKEN || '').trim();
   const hasIngest = !!(ingestUrl && ingestToken);
   const hasWebhook = !!process.env.WAITLIST_WEBHOOK_URL;
   const hasWeb3 = !!process.env.WEB3FORMS_KEY;
@@ -111,7 +118,20 @@ export default async function handler(req, res) {
       // from the Vercel function logs.
       console.error('[waitlist] Ingest failed. Lead was:',
         JSON.stringify(redact(lead)), String(err));
-      return res.status(502).json({ error: 'Could not reach the waitlist store' });
+      /* The upstream status goes in the response. It is not sensitive — a
+         number, no body — and without it the only way to tell a token
+         mismatch (401) from a missing table (500) from a wrong URL (404) is
+         to go and read the function log, which is a poor way to spend the
+         ten minutes after launching. The page shows its own wording; this is
+         for whoever is holding curl. */
+      return res.status(502).json({
+        error: 'Could not reach the waitlist store',
+        upstream: err && err.status ? err.status : null,
+        hint: err && err.status === 401 ? 'token mismatch, or the product was not redeployed after setting it'
+            : err && err.status === 404 ? 'wrong ONE_INTERIORS_INGEST_URL'
+            : err && err.status === 500 ? 'product reached, but it could not store — table missing? run npm run db:deploy'
+            : 'could not reach the product at all'
+      });
     }
   }
 
@@ -156,7 +176,9 @@ async function post(url, payload, extraHeaders = {}) {
       // from a 404, and "check your token" is very different advice from
       // "check your URL".
       const detail = await r.text().catch(() => '');
-      throw new Error(`Responded ${r.status}: ${detail.slice(0, 200)}`);
+      const e = new Error(`Responded ${r.status}: ${detail.slice(0, 200)}`);
+      e.status = r.status;
+      throw e;
     }
   } finally {
     clearTimeout(timer);
