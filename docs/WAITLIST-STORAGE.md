@@ -88,10 +88,19 @@ This is the only way to know which groups are worth a second push.
 
 ## What the visitor is told
 
-At the moment they type their number:
+At the moment they give their number, beside an **unticked** box they must tick:
 
-> We'll use your number to tell you when we go live, and to book your free
-> architect consultation. Nothing else, and never passed on.
+> Message me on WhatsApp or email about One Interiors — my place, my invite and
+> my call. [Privacy]
+
+and under the button:
+
+> Used for your invite and your call. Nothing else, and never passed on.
+
+`/privacy` on this site says what is collected, why, who handles it, how long it is
+kept and how to have it removed. Both sides refuse a signup without `consent: true`.
+This wording replaced the earlier sentence on 30 Sep 2026 — see the note on
+`POLICY_VERSION` below.
 
 Every row stores the `policyVersion` that was in force when they agreed —
 `POLICY_VERSION` in `src/modules/consent/policy.ts`. That is the same rule the

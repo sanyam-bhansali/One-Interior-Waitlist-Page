@@ -130,10 +130,18 @@ All three environments, save, then **Redeploy** as before.
 ```powershell
 curl.exe -s -X POST https://oneinteriors.in/api/waitlist `
   -H "Content-Type: application/json" `
-  -d '{\"name\":\"Test Person\",\"contact\":\"9822011234\",\"via\":\"setup-check\"}'
+  -d '{\"name\":\"Test Person\",\"contact\":\"9822011234\",\"consent\":true,\"via\":\"setup-check\"}'
 ```
 
-Expect `{"ok":true}`.
+Expect `{"ok":true,"code":"XXXXXXX","status":{...}}` — the code is their referral
+code, the status their place. Then:
+
+```powershell
+curl.exe -s https://oneinteriors.in/api/stats
+```
+
+Expect `{"ok":true,"stats":{"total":null,"launchAt":2000,"freeCallsLeft":999}}` —
+`total` stays `null` until 100 have joined.
 
 Then open **https://ops.oneinteriors.in/ops/waitlist**. The row should be
 there, tagged `setup-check`.
@@ -153,14 +161,33 @@ Read the answer, not the vibe — each failure says something different.
 
 | What you see | What it means |
 |---|---|
-| `{"ok":true,"mode":"preview"}` | The waitlist project has no `ONE_INTERIORS_INGEST_URL`. Step 7, then redeploy. |
-| `{"error":"Could not reach the waitlist store"}` | It reached the product and was refused, or the table is missing. Check the two tokens match exactly, and that Step 2 ran. |
+| `{"ok":true,"mode":"preview",...}` | The waitlist project has no `ONE_INTERIORS_INGEST_URL`. Step 7, then redeploy. |
+| `{"error":"Could not reach the waitlist store"}` | It reached the product and was refused, or the table is missing. The **function log** on the waitlist project says which (token, URL or table) — the response no longer does. |
+| `{"error":"Invalid submission","fields":["consent"]}` | The request had no `"consent":true`. The page always sends it; a hand-made curl must too. |
+| `{"error":"Invalid submission","fields":["turnstile"]}` | `TURNSTILE_SECRET_KEY` is set but `turnstileSiteKey` in `config.js` is not (or the other way round). Set both or neither. |
+| `{"error":"Too many attempts"}` | The per-IP limit (10 signups / 10 min). Wait, or test from another network. |
 | `{"error":"Not for you."}` | You called the product route directly without the token. Expected. |
 | Ops page says *"Nothing yet"* | Nothing has been stored. Check the Vercel function log on the **waitlist** project — a failed lead is written there in full and can be re-entered by hand. |
 | `relation "waitlist_signups" does not exist` | Step 2 did not run, or ran against a different database. |
 
 Nothing is ever lost quietly: if the ingest call fails, the whole signup is
 written to the waitlist project's function log.
+
+---
+
+## Optional · Turnstile (bot check)
+
+Free at Cloudflare → Turnstile → Add site (`oneinteriors.in`, widget mode *Managed*).
+Put the **site key** in `public/config.js` → `turnstileSiteKey`, and the **secret key**
+in Vercel as `TURNSTILE_SECRET_KEY`. Both, or neither — one without the other refuses
+every signup.
+
+---
+
+## Welcome messages
+
+The product sends them. Get the WhatsApp template approved first —
+`docs/WELCOME-MESSAGES.md` has the exact text.
 
 ---
 

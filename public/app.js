@@ -10,7 +10,7 @@
     formEndpoint: '/api/waitlist', sequence: {}, sequencePortrait: null,
     frames: [], framesPortrait: [], styleFrames: {}, logo: '', demoVideo: null,
     studioApplyUrl: null,
-    city: 'Pune', waitlistCount: 412, consultationMinutes: 45,
+    city: 'Pune', consultationMinutes: 30, turnstileSiteKey: '',
     whatsappShare: true, track: function () {}
   }, window.OI_CONFIG || {});
 
@@ -31,11 +31,16 @@
   var formErr   = document.getElementById('formErr');
 
   var lead = { name: '', contact: '', style: '' };
+  /* The waitlist gate (owner, 30 Sep 2026). Mirrors src/modules/waitlist/
+     queue.ts in the product; the product is the authority, these only word
+     the page before its answer arrives. */
+  var LAUNCH_AT = 2000, FREE_CALLS = 1000, CALL_AT = 3, CAB_AT = 5, SOCIETY_UNLOCK = 25;
+  var me = null;          // { code, status } once joined
+  var extras = { possession: '', bhk: '', style: '' };
 
   /* ---------- copy + logo from config ---------- */
   each(document.querySelectorAll('[data-city]'),  function (el) { el.textContent = CFG.city; });
   each(document.querySelectorAll('[data-mins]'),  function (el) { el.textContent = CFG.consultationMinutes; });
-  each(document.querySelectorAll('[data-count]'), function (el) { el.textContent = CFG.waitlistCount; });
   if (!CFG.whatsappShare) document.getElementById('shareBlock').hidden = true;
 
   /* The studio door.
@@ -401,7 +406,7 @@
      OPENING -> the opening turns to dust, the panels strike on
      ============================================================ */
   var alreadyJoined = readSaved();
-  if (alreadyJoined) joinBtn.textContent = 'You\u2019re already on the list';
+  if (alreadyJoined) joinBtn.textContent = 'See your place in line';
 
   joinBtn.addEventListener('click', function () {
     joinBtn.disabled = true;
@@ -410,12 +415,17 @@
     // straight to the finished room.
     if (alreadyJoined) {
       CFG.track('waitlist_return', {});
+      var fresh = alreadyJoined.code ? fetchStatus(alreadyJoined.code) : Promise.resolve(null);
       FX.dissolve(opening, { duration: 800 }).then(function () {
         opening.classList.add('gone');
         stage.classList.add('sty-warm');
         setStage(5);
+        return fresh;
+      }).then(function (st) {
+        me = { code: alreadyJoined.code || null, status: st };
+        renderFinale();
         return FX.materialize(finale, 'shown', { duration: 1100 });
-      });
+      }).then(showFilmButton);
       return;
     }
 
@@ -488,106 +498,362 @@
     document.getElementById('p2').classList.add('on');
     setStage(2);
     CFG.track('waitlist_step', { step: 1 });
+    loadTurnstile();
     setTimeout(function () { focus('inContact'); }, 120);
   }
 
-  /* ---------- step 2 ---------- */
-  document.getElementById('go2').addEventListener('click', step2);
-  document.getElementById('inContact').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); step2(); }
-  });
+  /* ---------- step 2: contact + consent, and that is the signup ---------- */
+  var consentBox = document.getElementById('inConsent');
   document.getElementById('inContact').addEventListener('input', function () {
     setError('inContact', 'errContact', '');
   });
-  function step2() {
+  consentBox.addEventListener('change', function () {
+    document.getElementById('errConsent').textContent = '';
+  });
+  function step2Valid() {
     var v = document.getElementById('inContact').value.trim();
     if (!(RE_EMAIL.test(v) || isIndianPhone(v))) {
       setError('inContact', 'errContact',
-        'That doesn\u2019t look quite right \u2014 we need a working number or email to reach you on.');
-      return;
+        'That doesn’t look quite right — we need a working WhatsApp number or email.');
+      return false;
     }
     lead.contact = v;
-    swap('s2', 's3');
-    document.getElementById('p3').classList.add('on');
-    CFG.track('waitlist_step', { step: 2 });
+    if (!consentBox.checked) {
+      document.getElementById('errConsent').textContent =
+        'Tick this so we can send you your place and your invite.';
+      consentBox.focus();
+      return false;
+    }
+    if (CFG.turnstileSiteKey && !tsToken) {
+      document.getElementById('errConsent').textContent =
+        'One moment — we’re checking this isn’t a bot.';
+      return false;
+    }
+    return true;
   }
 
-  /* ---------- step 3 ---------- */
-  var chips = document.querySelectorAll('.chip');
-  each(chips, function (chip) {
+  /* ---------- Cloudflare Turnstile, only when a site key is set ---------- */
+  var tsToken = '', tsWidget = null;
+  function loadTurnstile() {
+    if (!CFG.turnstileSiteKey || loadTurnstile.done) return;
+    loadTurnstile.done = true;
+    var box = document.getElementById('tsBox');
+    window.oiTurnstile = function () {
+      box.hidden = false;
+      tsWidget = window.turnstile.render(box, {
+        sitekey: CFG.turnstileSiteKey, theme: 'dark', size: 'flexible',
+        callback: function (t) { tsToken = t; document.getElementById('errConsent').textContent = ''; },
+        'expired-callback': function () { tsToken = ''; }
+      });
+    };
+    var sc = document.createElement('script');
+    sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=oiTurnstile';
+    sc.async = true;
+    document.head.appendChild(sc);
+  }
+  function resetTurnstile() {
+    tsToken = '';
+    try { if (tsWidget !== null && window.turnstile) window.turnstile.reset(tsWidget); } catch (e) {}
+  }
+
+  /* ---------- step 3: after joining, "move up 20 places" (all optional) ---------- */
+  var extrasBtn = document.getElementById('extrasBtn');
+  each(document.querySelectorAll('#s3 .opts'), function (group) {
+    var q = group.getAttribute('data-q');
+    each(group.querySelectorAll('.chip'), function (chip) {
+      chip.addEventListener('click', function () {
+        var on = chip.getAttribute('aria-pressed') !== 'true';
+        each(group.querySelectorAll('.chip'), function (c) { c.setAttribute('aria-pressed', 'false'); });
+        chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+        extras[q] = on ? chip.getAttribute('data-v') : '';
+        extrasReady();
+      });
+    });
+  });
+  var styleChips = document.querySelectorAll('#s3 .styles .chip');
+  each(styleChips, function (chip) {
     chip.addEventListener('click', function () {
-      each(chips, function (c) { c.setAttribute('aria-pressed', 'false'); });
+      each(styleChips, function (c) { c.setAttribute('aria-pressed', 'false'); });
       chip.setAttribute('aria-pressed', 'true');
       var key = chip.getAttribute('data-style');
-      lead.style = chip.textContent.trim();
+      extras.style = chip.textContent.trim();
       stage.classList.remove('sty-warm', 'sty-modern', 'sty-industrial', 'sty-traditional');
       stage.classList.add('sty-' + key);
       if (usingMedia && CFG.styleFrames && CFG.styleFrames[key]) {
         var f3 = media.querySelector('img[data-s="3"]');
         if (f3) f3.src = CFG.styleFrames[key];
       }
-      setStage(3);
-      submitBtn.disabled = false;
       CFG.track('waitlist_style', { style: key });
     });
+  });
+  document.getElementById('inSociety').addEventListener('input', extrasReady);
+  /* The 20 places are for the answers that help us line up studios — keys,
+     size or society (the product grants them on the same rule). A style
+     alone is kept, but moves nobody. */
+  function extrasReady() {
+    extrasBtn.disabled = !(extras.possession || extras.bhk ||
+      document.getElementById('inSociety').value.trim().length >= 2);
+  }
+  extrasBtn.addEventListener('click', function () {
+    if (extrasBtn.disabled) return;
+    extrasBtn.disabled = true;
+    extrasBtn.classList.add('busy');
+    var body = {
+      code: me && me.code, possession: extras.possession || null, bhk: extras.bhk || null,
+      society: document.getElementById('inSociety').value.trim() || null,
+      style: extras.style || null
+    };
+    CFG.track('waitlist_extras', { possession: body.possession, bhk: body.bhk, society: !!body.society });
+    var go = (me && me.code && CFG.formEndpoint)
+      ? postJson('/api/extras', body).then(function (j) { if (j && j.status) me.status = j.status; })
+      : wait(400);
+    go.catch(function (err) {
+      // Never hold them here: the answers are a bonus, the signup is done.
+      CFG.track('waitlist_error', { message: 'extras ' + String((err && err.message) || err) });
+    }).then(toFinale);
+  });
+  document.getElementById('extrasSkip').addEventListener('click', function () {
+    CFG.track('waitlist_extras_skip', {});
+    toFinale();
   });
 
   /* ============================================================
      SUBMIT
-     Optimistic: the room starts furnishing the moment they click,
-     because the animation covers the round trip. On failure the
-     room rolls back and the card returns with everything in it.
+     Optimistic: the room lights the moment they click, because the
+     animation covers the round trip. On failure the room rolls back
+     and the card stays with everything in it.
      ============================================================ */
   card.addEventListener('submit', function (e) {
     e.preventDefault();
+    // Enter in the name field is "continue", not "submit".
+    if (!document.getElementById('s1').hidden) { step1(); return; }
+    if (document.getElementById('s2').hidden) return;
     if (submitBtn.disabled) return;
     if (document.getElementById('company').value) return;   // honeypot
+    if (!step2Valid()) return;
 
     submitBtn.disabled = true;
     submitBtn.classList.add('busy');
-    document.getElementById('submitLabel').textContent = 'Reserving your slot';
+    document.getElementById('submitLabel').textContent = 'Saving your place';
     formErr.hidden = true;
 
-    setStage(4);
+    setStage(3);
 
     send(buildPayload())
-      .then(function () {
+      .then(function (json) {
+        me = { code: (json && json.code) || null, status: (json && json.status) || null };
         remember();
-        CFG.track('waitlist_submit', { style: lead.style });
-        return FX.dissolve(card, { duration: 1050 });
-      })
-      .then(function () {
-        cardWrap.style.pointerEvents = 'none';
-        return wait(reduce ? 100 : 480);
-      })
-      .then(function () {
-        setStage(5);
-        return FX.materialize(finale, 'shown', { duration: 1150 });
-      })
-      .then(function () {
-        if (!(CFG.demoVideo && CFG.demoVideo.src)) return;
-        // Let them read the finale before anything happens to it.
-        return wait(2100).then(function () {
-          if (CFG.stickman !== false && window.Stickman && Stickman.supported()) return curtain(skippedBefore());
-          var b = document.getElementById('demoBtn');
-          b.hidden = false;
-          return FX.materialize(b, 'shown', { duration: 700, count: 220 });
-        });
+        clearRef();
+        CFG.track('waitlist_submit', { referred: !!readRef(), created: !!(json && json.created) });
+        setStage(4);
+        // Someone joining again who already answered goes straight to their place.
+        if (me.status && me.status.answered) return toFinale();
+        showExtras();
       })
       .catch(function (err) {
-        setStage(3);
-        card.classList.add('up');
-        card.style.opacity = '';
+        setStage(2);
+        resetTurnstile();
         submitBtn.disabled = false;
         submitBtn.classList.remove('busy');
         document.getElementById('submitLabel').textContent = 'Try again';
         formErr.hidden = false;
         formErr.textContent = (err && err.friendly)
           ? err.message
-          : 'That didn\u2019t save \u2014 nothing\u2019s lost, your details are still here. Try once more?';
+          : 'That didn’t save — nothing’s lost, your details are still here. Try once more?';
         CFG.track('waitlist_error', { message: String((err && err.message) || err) });
       });
   });
+
+  function showExtras() {
+    var st = me && me.status;
+    document.getElementById('s3Eyebrow').textContent =
+      'You’re on the list' + (st && st.firstName ? ', ' + st.firstName : '');
+    document.getElementById('s3Title').textContent = st && st.position
+      ? 'You’re #' + fmt(st.position) + '. Move up 20 places?'
+      : 'Move up 20 places?';
+    swap('s2', 's3');
+    document.getElementById('p3').classList.add('on');
+    CFG.track('waitlist_step', { step: 3 });
+  }
+
+  var finishing = false;
+  function toFinale() {
+    if (finishing) return;
+    finishing = true;
+    return FX.dissolve(card, { duration: 1050 })
+      .then(function () {
+        cardWrap.style.pointerEvents = 'none';
+        return wait(reduce ? 100 : 480);
+      })
+      .then(function () {
+        setStage(5);
+        renderFinale();
+        return FX.materialize(finale, 'shown', { duration: 1150 });
+      })
+      .then(showFilmButton);
+  }
+
+  /* The film no longer plays itself: the first seconds after joining are
+     when someone is most likely to share, and the stickman used to kick
+     their link off the screen. Now he comes on only when asked. */
+  function showFilmButton() {
+    if (!(CFG.demoVideo && CFG.demoVideo.src)) return;
+    var b = document.getElementById('demoBtn');
+    b.hidden = false;
+  }
+
+  /* ============================================================
+     THEIR PLACE
+     Everything on the confirmation screen comes from the product's
+     answer (src/modules/waitlist/queue.ts): place, referrals, what
+     they have unlocked, their society. With no answer (preview mode,
+     or the product unreachable) it says only that the place is saved.
+     ============================================================ */
+  function renderFinale() {
+    var st = me && me.status;
+    var code = (me && me.code) || (st && st.code) || null;
+    var fTitle = document.getElementById('fTitle');
+    var fMark = document.getElementById('fMark');
+
+    if (st && st.position) {
+      fMark.textContent = 'You’re on the list' + (st.firstName ? ', ' + st.firstName : '');
+      fTitle.textContent = 'You’re #' + fmt(st.position) + ' in line.';
+    } else {
+      fMark.textContent = 'You’re on the list';
+      fTitle.textContent = 'Your place is saved.';
+    }
+
+    if (st && st.stats) paintGate(st.stats);
+
+    // The call: free because they were early, free because they brought
+    // three, or ₹5,000 with the way to make it free.
+    var u = (st && st.unlocks) || null;
+    var callText = document.getElementById('fCallText');
+    var mins = CFG.consultationMinutes;
+    if (!u || u.freeCall) {
+      callText.innerHTML = 'Your <b>' + mins + '-minute architect call</b> — ' +
+        '<s class="was">₹5,000</s> <b>free</b>' +
+        (u && u.freeCallReason === 'referrals' ? ', thanks to your friends' : '') +
+        '. We’ll call to book it.';
+    } else {
+      callText.innerHTML = 'The first 1,000 free calls are taken. Bring <b>' + CALL_AT +
+        ' friends</b> and your <b>₹5,000 architect call is free</b>.';
+    }
+
+    var ladder = document.getElementById('ladder');
+    if (!code) { ladder.hidden = true; paintShare(null); return; }
+    ladder.hidden = false;
+
+    var refs = (st && st.referrals) || 0;
+    var head = refs === 0
+      ? 'Bring friends, move up'
+      : 'You’ve brought ' + refs + ' friend' + (refs === 1 ? '' : 's');
+    if (u && u.next) {
+      head += ' · ' + u.next.friends + ' more: ' + u.next.unlocks;
+    }
+    document.getElementById('ladderHead').textContent = head;
+    each(document.querySelectorAll('.rungs li'), function (li) {
+      var at = Number(li.getAttribute('data-at'));
+      li.classList.toggle('done', refs >= at);
+      if (at === CALL_AT && u && u.freeCallReason === 'early') {
+        li.classList.add('done');
+        li.querySelector('span').textContent = 'your call is already free — you joined early';
+      }
+      if (at === CAB_AT && u && u.cabReason === 'society') {
+        li.classList.add('done');
+        li.querySelector('span').textContent = 'free cab — your society unlocked it';
+      }
+    });
+
+    var soc = document.getElementById('society');
+    if (st && st.society) {
+      var n = st.societyCount || 0;
+      soc.hidden = false;
+      soc.textContent = n >= SOCIETY_UNLOCK
+        ? st.society + ' has ' + n + ' members — everyone there gets a free cab to the studio and the first invites.'
+        : st.society + ': ' + n + ' of ' + SOCIETY_UNLOCK + ' neighbours have joined. At ' +
+          SOCIETY_UNLOCK + ', everyone there gets a free cab to the studio and the first invites.';
+    } else {
+      soc.hidden = true;
+    }
+
+    document.getElementById('myLink').value = linkFor(code);
+    paintShare(code);
+  }
+
+  function linkFor(code) {
+    var base = (location.origin && location.origin.indexOf('http') === 0)
+      ? location.origin : 'https://oneinteriors.in';
+    return base + '/?r=' + code;
+  }
+
+  /* ============================================================
+     THE GATE — members so far, and free calls left
+     "3 people have joined" does more harm than no number, so the
+     count appears from a hundred (the product sends null below it).
+     The free-call counter is shown from the start.
+     ============================================================ */
+  function paintGate(stats) {
+    if (!stats) return;
+    var launch = stats.launchAt || LAUNCH_AT;
+    var total = typeof stats.total === 'number' ? stats.total : null;
+    var pct = total === null ? 0 : Math.min(100, Math.round(total / launch * 100));
+
+    var gateText = document.getElementById('gateText');
+    var gateBar = document.getElementById('gateBar');
+    if (total === null) {
+      gateText.textContent = 'Founding list open · ' + CFG.city + ' opens at ' + fmt(launch);
+      gateBar.hidden = true;
+    } else {
+      gateText.textContent = fmt(total) + ' of ' + fmt(launch) + ' joined · ' +
+        CFG.city + ' opens at ' + fmt(launch);
+      gateBar.hidden = false;
+      document.getElementById('gateFill').style.width = pct + '%';
+    }
+
+    var calls = document.getElementById('gateCalls');
+    if (typeof stats.freeCallsLeft === 'number') {
+      calls.hidden = false;
+      calls.textContent = stats.freeCallsLeft > 0
+        ? fmt(stats.freeCallsLeft) + ' of ' + fmt(FREE_CALLS) + ' free calls left'
+        : 'The 1,000 free calls are taken — bring 3 friends and yours is free';
+    }
+
+    var fGate = document.getElementById('fGate');
+    if (total === null) { fGate.hidden = true; }
+    else {
+      fGate.hidden = false;
+      document.getElementById('fGateText').textContent =
+        fmt(total) + ' of ' + fmt(launch) + ' joined';
+      document.getElementById('fGateFill').style.width = pct + '%';
+    }
+  }
+
+  if (CFG.formEndpoint) {
+    fetch('/api/stats', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.stats) paintGate(j.stats); })
+      .catch(function () { /* the line keeps its default wording */ });
+  }
+
+  /* ============================================================
+     REFERRALS IN
+     ?r=CODE is a friend's link. Kept for the visit (and the next
+     one on this device) so reading the "why" first doesn't lose it.
+     ============================================================ */
+  (function () {
+    try {
+      var r = new URLSearchParams(location.search).get('r');
+      r = r ? String(r).trim().toUpperCase() : '';
+      if (/^[A-HJ-NP-Z2-9]{7}$/.test(r)) localStorage.setItem('oi_ref', r);
+    } catch (e) {}
+  })();
+  function readRef() {
+    try { return localStorage.getItem('oi_ref') || null; } catch (e) { return null; }
+  }
+  function clearRef() {
+    try { localStorage.removeItem('oi_ref'); } catch (e) {}
+  }
 
   /* Where this visitor came from. One link per society — oneinteriors.in/?s=baner-greens —
      is the only way to know which groups actually worked; without this the page
@@ -598,15 +864,19 @@
       var v = q.get('s') || q.get('src') || q.get('utm_source') || '';
       // whitelist, not blacklist: this string ends up in someone's inbox
       v = String(v).trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48);
+      if (!v && readRef()) v = 'referral';
       return v || null;
     } catch (e) { return null; }
   }
 
   function buildPayload() {
     return {
-      name: lead.name, contact: lead.contact, style: lead.style,
+      name: lead.name, contact: lead.contact,
       city: CFG.city, source: 'waitlist-landing',
+      consent: true,
+      ref: readRef(),
       via: referrerTag(),
+      turnstile: tsToken || undefined,
       submittedAt: new Date().toISOString()
     };
   }
@@ -614,7 +884,7 @@
   function send(payload) {
     if (!CFG.formEndpoint) {
       console.info('[One Interiors] Preview mode — no endpoint set.', payload);
-      return wait(600);
+      return wait(600).then(function () { return { ok: true, code: null, status: null }; });
     }
     return fetch(CFG.formEndpoint, {
       method: 'POST',
@@ -625,24 +895,53 @@
         return res.json().then(function (b) {
           var f = (b && b.fields) || [];
           var e = new Error(f.indexOf('contact') > -1
-            ? 'That doesn\u2019t look quite right \u2014 we need a working number or email to reach you on.'
-            : 'Something there didn\u2019t come through. Have a quick look and try again?');
+            ? 'That doesn’t look quite right — we need a working WhatsApp number or email.'
+            : f.indexOf('turnstile') > -1
+            ? 'We couldn’t confirm this isn’t a bot. Give it a second and try again?'
+            : 'Something there didn’t come through. Have a quick look and try again?');
           e.friendly = true;
           throw e;
         });
+      }
+      if (res.status === 429) {
+        var e429 = new Error('A lot of tries from this connection — give it a few minutes and try again.');
+        e429.friendly = true;
+        throw e429;
       }
       if (res.status === 404 || res.status === 405) {
         console.error('[One Interiors] ' + CFG.formEndpoint + ' returned ' + res.status +
           '. The serverless function is not deployed at that path. On a static host ' +
           'with no API, set formEndpoint to "" in config.js to run in preview mode.');
-        var e404 = new Error('Sign-ups aren\u2019t connected yet \u2014 we couldn\u2019t save your ' +
+        var e404 = new Error('Sign-ups aren’t connected yet — we couldn’t save your ' +
           'details. Please try again shortly.');
         e404.friendly = true;
         throw e404;
       }
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res;
+      return res.json().catch(function () { return {}; });
     });
+  }
+
+  function postJson(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function fetchStatus(code) {
+    if (!CFG.formEndpoint) return Promise.resolve(null);
+    return postJson('/api/status', { code: code })
+      .then(function (j) { return (j && j.status) || null; })
+      .catch(function () { return null; });
+  }
+
+  function fmt(n) {
+    try { return Number(n).toLocaleString('en-IN'); } catch (e) { return String(n); }
   }
 
   /* ============================================================
@@ -657,6 +956,10 @@
 
     document.getElementById('demoBtn').addEventListener('click', function () {
       CFG.track('demo_open', {});
+      if (CFG.stickman !== false && window.Stickman && Stickman.supported()) {
+        curtain(skippedBefore());
+        return;
+      }
       document.body.classList.add('film');
       FX.dissolve(finale, { duration: 900 })
         .then(function () { return wait(reduce ? 80 : 400); })
@@ -865,27 +1168,124 @@
 
   /* ============================================================
      SHARE
+     Their own link, so every friend who joins through it moves them
+     up. WhatsApp first: it is where Pune's society groups live.
      ============================================================ */
-  var shareText = 'One Interiors is launching in ' + CFG.city +
-    ' — verified interior designers, an instant quote, and a free architect ' +
-    'consultation for anyone on the waitlist. Worth a look:';
+  function shareText(code) {
+    return 'I\u2019ve joined One Interiors \u2014 10 verified interior studios in ' + CFG.city +
+      ', an instant quote, and a \u20b95,000 architect call free for the first 1,000. ' +
+      (code ? 'Join through my link: ' : 'Worth a look: ');
+  }
+  var shareCode = null;
+  function paintShare(code) {
+    shareCode = code;
+    document.getElementById('shareLabel').textContent = code
+      ? 'Every friend who joins through your link moves you up 25 places'
+      : 'Know someone who just got their keys?';
+  }
 
   document.getElementById('shareBtn').addEventListener('click', function () {
-    var url = window.location.href.split('#')[0];
-    CFG.track('waitlist_share', {});
-    if (navigator.share) {
-      navigator.share({ title: 'One Interiors', text: shareText, url: url }).catch(function () {});
-      return;
-    }
-    window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + url),
+    var url = shareCode ? linkFor(shareCode) : window.location.origin + '/';
+    CFG.track('waitlist_share', { personal: !!shareCode });
+    window.open('https://wa.me/?text=' + encodeURIComponent(shareText(shareCode) + url),
       '_blank', 'noopener');
   });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var box = document.getElementById('myLink');
+    var btn = this;
+    var done = function () {
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 1800);
+    };
+    CFG.track('link_copy', {});
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(box.value).then(done, function () { box.select(); });
+    } else {
+      box.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+    }
+  });
+
+  /* ============================================================
+     MEMBER BENEFITS
+     The same dissolve grammar as "Why we started this". Opens from
+     the opening screen or from their place, and returns to whichever
+     it came from.
+     ============================================================ */
+  (function () {
+    var panel = document.getElementById('perks');
+    var close = document.getElementById('perksClose');
+    var from = null, open = false;
+
+    function show(src) {
+      if (open) return; open = true; from = src;
+      CFG.track('perks_open', { from: src === finale ? 'finale' : 'opening' });
+      panel.hidden = false;
+      document.body.classList.add('why-open');
+      FX.dissolve(src, { duration: 700 })
+        .then(function () {
+          if (src === opening) opening.classList.add('gone');
+          return wait(reduce ? 80 : 300);
+        })
+        .then(function () { return FX.materialize(panel, 'shown', { duration: 900 }); })
+        .then(function () { close.focus({ preventScroll: true }); });
+    }
+    function hide() {
+      if (!open) return; open = false;
+      document.body.classList.remove('why-open');
+      FX.dissolve(panel, { duration: 650 })
+        .then(function () { return wait(reduce ? 80 : 280); })
+        .then(function () {
+          if (from === opening) opening.classList.remove('gone');
+          return FX.materialize(from, 'shown', { duration: 850 });
+        })
+        .then(function () {
+          if (from === opening) opening.classList.remove('shown');
+          panel.hidden = true;
+        });
+    }
+    document.getElementById('perksBtn').addEventListener('click', function () { show(opening); });
+    document.getElementById('fPerksBtn').addEventListener('click', function () { show(finale); });
+    close.addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && open) hide();
+    });
+  })();
+
+  /* ============================================================
+     ANALYTICS CONSENT
+     GA starts with analytics storage denied (ga.js). This asks once.
+     ============================================================ */
+  (function () {
+    var bar = document.getElementById('cookies');
+    if (!bar || !window.OI_ANALYTICS || window.OI_ANALYTICS.choice) return;
+    // A beat late, so it never sits on top of the opening line.
+    setTimeout(function () { bar.hidden = false; }, 2500);
+    function choose(yes) {
+      window.OI_ANALYTICS.set(yes);
+      bar.hidden = true;
+    }
+    document.getElementById('ckYes').addEventListener('click', function () { choose(true); });
+    document.getElementById('ckNo').addEventListener('click', function () { choose(false); });
+    /* On a phone it would sit on the form's buttons. Once they start
+       joining it stands down unanswered — analytics stays off — and asks
+       again next visit. */
+    joinBtn.addEventListener('click', function () { bar.hidden = true; });
+    each(document.querySelectorAll('#whyBtn, #perksBtn'), function (b) {
+      b.addEventListener('click', function () { bar.hidden = true; });
+    });
+  })();
 
   /* ============================================================
      RETURNING VISITORS
      ============================================================ */
   function remember() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ name: lead.name, at: Date.now() })); }
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        name: lead.name, code: (me && me.code) || null, at: Date.now()
+      }));
+    }
     catch (e) {}
   }
   function readSaved() {
@@ -901,6 +1301,15 @@
      ============================================================ */
   (function preview() {
     var want = (location.hash || '').replace('#', '');
+    if (want === 'finale-demo') {
+      want = 'finale';
+      me = { code: 'ABCD234', status: {
+        code: 'ABCD234', firstName: 'Asha', position: 212, joined: 237, referrals: 1, answered: true,
+        society: 'Kolte Patil Life Republic', societyCount: 9,
+        unlocks: { freeCall: true, freeCallReason: 'early', cab: false, cabReason: null, priority: false,
+          next: { friends: 4, unlocks: 'a free cab to the studio' } },
+        stats: { total: 640, launchAt: 2000, freeCallsLeft: 360 } } };
+    }
     if (want !== 'finale' && want !== 'demo') return;
     opening.classList.add('gone');
     stage.classList.add('sty-warm');
@@ -908,6 +1317,9 @@
     if (want === 'demo' && CFG.demoVideo && CFG.demoVideo.src) {
       demo.hidden = false; demo.classList.add('shown');
     } else {
+      // #finale shows the no-code state; #finale-demo a made-up member, to
+      // check the ladder's layout. Neither calls the API.
+      renderFinale();
       finale.classList.add('shown');
       if (CFG.demoVideo && CFG.demoVideo.src) document.getElementById('demoBtn').hidden = false;
     }

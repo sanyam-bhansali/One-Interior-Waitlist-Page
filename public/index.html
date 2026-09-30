@@ -3,28 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Google tag (gtag.js) — GA4 -->
+<!-- Google tag (gtag.js) — GA4, consent defaults set first in ga.js -->
+<script src="ga.js"></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y451K5CT0R"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  /* The society tag from ?s=baner-greens, attached to every hit for this
-     visitor rather than to one event. The whole campaign is one WhatsApp
-     message per society, so "which society" has to be a property of the
-     SESSION — otherwise it only ever lands on the pageview and no funnel
-     step can be segmented by it. */
-  var oiVia = null;
-  try {
-    var q = new URLSearchParams(location.search);
-    oiVia = (q.get('s') || q.get('src') || q.get('utm_source') || '')
-      .trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48) || null;
-  } catch (e) {}
-
-  gtag('config', 'G-Y451K5CT0R', oiVia ? { via: oiVia } : {});
-  if (oiVia) gtag('set', 'user_properties', { via: oiVia });
-</script>
 
 <link rel="canonical" href="https://oneinteriors.in/">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -33,13 +14,13 @@
 <meta property="og:locale" content="en_IN">
 
 <title>One Interiors — Join the Pune waitlist</title>
-<meta name="description" content="A curated marketplace of verified interior designers, launching first in Pune. Join the waitlist and get a free consultation with a registered architect.">
+<meta name="description" content="10 verified interior studios, an instant quote, and a 30-minute call with a registered architect — ₹5,000, free for the first 1,000 to join. Pune opens at 2,000 members.">
 <meta name="theme-color" content="#07090a">
 
 <!-- Link previews (WhatsApp, Instagram DMs, LinkedIn) -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="One Interiors — Join the Pune waitlist">
-<meta property="og:description" content="Verified designers, an instant quote, and a free consultation with a registered architect. Launching first in Pune.">
+<meta property="og:description" content="10 verified studios, an instant quote, and a ₹5,000 architect call free for the first 1,000 to join. Pune opens at 2,000 members.">
 <meta property="og:image" content="https://oneinteriors.in/assets/og-room.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -50,7 +31,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:SOFT,WONK,opsz,wght@0..100,0..1,9..144,300..600&family=Jost:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20260930">
 
 <script type="application/ld+json">
 {
@@ -305,9 +286,20 @@
     <button class="joinbtn" id="joinBtn" type="button">Join Waitlist</button>
     <p class="perk">
       <span class="dot"></span>
-      <span>Waitlist members get a free consultation with a registered architect</span>
+      <span>A <span data-mins>30</span>-minute call with a registered architect —
+      <s class="was">₹5,000</s> <b>free for the first 1,000</b> to join</span>
     </p>
-    <button class="why-link t-mono" id="whyBtn" type="button">Why we started this</button>
+    <!-- Filled from /api/stats. Below a hundred it says only that the list is
+         open; the number appears from a hundred. -->
+    <p class="gate t-mono" id="gateLine">
+      <span id="gateText">Founding list open · <span data-city>Pune</span> opens at 2,000</span>
+      <span class="gatebar" id="gateBar" hidden><i id="gateFill"></i></span>
+      <span class="gatecalls" id="gateCalls" hidden></span>
+    </p>
+    <div class="openlinks">
+      <button class="why-link t-mono" id="perksBtn" type="button">Member benefits · up to ₹76,000</button>
+      <button class="why-link t-mono" id="whyBtn" type="button">Why we started this</button>
+    </div>
     <div class="hint t-mono">Move your cursor — the room is still dark</div>
   </div>
 
@@ -323,9 +315,9 @@
 
       <!-- Step 1 -->
       <div class="step" id="s1">
-        <div class="eyebrow t-mono">Step 1 of 3</div>
+        <div class="eyebrow t-mono">Step 1 of 2</div>
         <h2 class="t-title">What should we call you?</h2>
-        <p class="sub">Under thirty seconds. No account, no sales call.</p>
+        <p class="sub">Two questions. No account, no sales call.</p>
         <div class="field">
           <label class="t-mono" for="inName">Your name</label>
           <input type="text" id="inName" name="name" autocomplete="given-name"
@@ -335,50 +327,81 @@
         <button class="cta" id="go1" type="button">Continue</button>
         <p class="cardperk">
           <span class="dot"></span>
-          <span>Everyone on this list gets a <b>free <span data-mins>45</span>-minute consultation
-          with a registered architect</b> — before you commit to anything.</span>
+          <span>Before you commit to anything: a <b><span data-mins>30</span>-minute call with a
+          registered architect</b> — <s class="was">₹5,000</s> <b>free for the first 1,000</b> to join.</span>
         </p>
       </div>
 
       <!-- Step 2 -->
       <div class="step" id="s2" hidden>
-        <div class="eyebrow t-mono">Step 2 of 3</div>
+        <div class="eyebrow t-mono">Step 2 of 2</div>
         <h2 id="greet" class="t-title">Good to meet you.</h2>
-        <p class="sub">Where should your invite and consultation slot go?</p>
+        <p class="sub">Where should we send your place in line?</p>
         <div class="field">
-          <label class="t-mono" for="inContact">Phone or email</label>
+          <label class="t-mono" for="inContact">WhatsApp number or email</label>
           <input type="text" id="inContact" name="contact" autocomplete="tel"
-                 inputmode="tel" placeholder="+91 98XXX XXXXX" enterkeyhint="next">
+                 inputmode="tel" placeholder="+91 98XXX XXXXX" enterkeyhint="send">
           <span class="err" id="errContact" role="alert"></span>
         </div>
-        <button class="cta" id="go2" type="button">Continue</button>
-        <p class="cardperk">
-          <span class="dot"></span>
-          <span>We'll use your number to tell you when we go live, and to book your <b>free architect consultation</b>. Nothing else, and never passed on.</span>
-        </p>
-      </div>
-
-      <!-- Step 3 -->
-      <div class="step" id="s3" hidden>
-        <div class="eyebrow t-mono">Step 3 of 3</div>
-        <h2 class="t-title">Which of these feels like home?</h2>
-        <p class="sub">No wrong answer — it just tells us which studios to start with.</p>
-        <div class="styles" role="group" aria-label="Style preference">
-          <button class="chip" type="button" aria-pressed="false" data-style="warm">Warm Minimalist</button>
-          <button class="chip" type="button" aria-pressed="false" data-style="modern">Modern Classic</button>
-          <button class="chip" type="button" aria-pressed="false" data-style="industrial">Industrial Loft</button>
-          <button class="chip" type="button" aria-pressed="false" data-style="traditional">Traditional Indian</button>
-        </div>
-        <button class="cta" id="submitBtn" type="submit" disabled>
+        <label class="consent" for="inConsent">
+          <input type="checkbox" id="inConsent" name="consent">
+          <span>Message me on WhatsApp or email about One Interiors — my place, my
+          invite and my call. <a href="/privacy" target="_blank" rel="noopener">Privacy</a></span>
+        </label>
+        <span class="err" id="errConsent" role="alert"></span>
+        <!-- Cloudflare Turnstile renders here when config.js has a site key. -->
+        <div class="ts" id="tsBox" hidden></div>
+        <button class="cta" id="submitBtn" type="submit">
           <span class="spin" aria-hidden="true"></span>
           <span id="submitLabel">Put me on the list</span>
         </button>
         <div class="formerr" id="formErr" role="alert" hidden></div>
         <p class="cardperk">
           <span class="dot"></span>
-          <span>Joining <b><span data-count>412</span> <span data-city>Pune</span> homeowners</b>
-          already on the list. First cohort.</span>
+          <span>Used for your invite and your call. Nothing else, and never passed on.</span>
         </p>
+      </div>
+
+      <!-- Step 3 · after joining, optional: "skip 20 places" -->
+      <div class="step" id="s3" hidden>
+        <div class="eyebrow t-mono" id="s3Eyebrow">You're on the list</div>
+        <h2 class="t-title" id="s3Title">Move up 20 places?</h2>
+        <p class="sub">Three quick answers help us line up the right studios. All optional.</p>
+
+        <div class="qlabel t-mono">Do you have the keys?</div>
+        <div class="opts" role="group" aria-label="Possession" data-q="possession">
+          <button class="chip" type="button" aria-pressed="false" data-v="HAVE_KEYS">I have them</button>
+          <button class="chip" type="button" aria-pressed="false" data-v="WITHIN_3_MONTHS">Within 3 months</button>
+          <button class="chip" type="button" aria-pressed="false" data-v="LATER">Later</button>
+        </div>
+
+        <div class="qlabel t-mono">Home size</div>
+        <div class="opts opts4" role="group" aria-label="Home size" data-q="bhk">
+          <button class="chip" type="button" aria-pressed="false" data-v="1">1 BHK</button>
+          <button class="chip" type="button" aria-pressed="false" data-v="2">2 BHK</button>
+          <button class="chip" type="button" aria-pressed="false" data-v="3">3 BHK</button>
+          <button class="chip" type="button" aria-pressed="false" data-v="4+">4+</button>
+        </div>
+
+        <div class="field">
+          <label class="t-mono" for="inSociety">Society or building</label>
+          <input type="text" id="inSociety" name="society" autocomplete="off" maxlength="80"
+                 placeholder="e.g. Kolte Patil Life Republic">
+        </div>
+
+        <div class="qlabel t-mono">Which feels like home?</div>
+        <div class="styles" role="group" aria-label="Style preference" data-q="style">
+          <button class="chip" type="button" aria-pressed="false" data-style="warm">Warm Minimalist</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="modern">Modern Classic</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="industrial">Industrial Loft</button>
+          <button class="chip" type="button" aria-pressed="false" data-style="traditional">Traditional Indian</button>
+        </div>
+
+        <button class="cta" id="extrasBtn" type="button" disabled>
+          <span class="spin" aria-hidden="true"></span>
+          <span id="extrasLabel">Move me up 20 places</span>
+        </button>
+        <button class="textbtn t-mono" id="extrasSkip" type="button">Not now</button>
       </div>
     </form>
   </div>
@@ -386,18 +409,69 @@
   <!-- ===== Finale ===== -->
   <div class="finale" id="finale" role="status" aria-live="polite">
     <img data-logo class="flogo" alt="One Interiors" hidden>
-    <div class="fmark t-mono">You're on the list</div>
-    <h1 class="t-display">Just like this, your space comes together.</h1>
-    <p class="flead">Now sit back and relax. We'll design it for you.</p>
-    <p class="fperk">
+    <div class="fmark t-mono" id="fMark">You're on the list</div>
+    <h1 class="t-display" id="fTitle">Your place is saved.</h1>
+    <p class="flead" id="fLead"><span data-city>Pune</span> opens when 2,000 people have joined.
+    Invites go out in queue order.</p>
+
+    <div class="fgate" id="fGate" hidden>
+      <span class="fgate-t t-mono" id="fGateText"></span>
+      <span class="gatebar"><i id="fGateFill"></i></span>
+    </div>
+
+    <p class="fperk" id="fCall">
       <span class="dot"></span>
-      <span>Your <b>free architect consultation</b> is reserved — we'll call to book it.</span>
+      <span id="fCallText">Your <b><span data-mins>30</span>-minute architect call</b> —
+      <s class="was">₹5,000</s> <b>free</b> for the first 1,000. We'll call to book it.</span>
     </p>
-    <button class="ghost" id="demoBtn" type="button" hidden>See how it works</button>
+
+    <!-- The referral ladder. Hidden until we have their code. -->
+    <div class="ladder" id="ladder" hidden>
+      <div class="ladder-h t-mono" id="ladderHead">Bring friends, move up</div>
+      <ol class="rungs">
+        <li data-at="1"><b>1 friend</b><span>up 25 places</span></li>
+        <li data-at="3"><b>3 friends</b><span>your ₹5,000 call, free</span></li>
+        <li data-at="5"><b>5 friends</b><span>a free cab to the studio</span></li>
+      </ol>
+      <p class="society" id="society" hidden></p>
+      <div class="linkrow">
+        <input class="linkbox t-mono" id="myLink" type="text" readonly aria-label="Your link">
+        <button class="ghost small" id="copyBtn" type="button">Copy</button>
+      </div>
+    </div>
 
     <div class="share" id="shareBlock">
-      <span class="label t-mono">Know someone who just got their keys?</span>
-      <button class="ghost" id="shareBtn" type="button">Share the waitlist</button>
+      <span class="label t-mono" id="shareLabel">Know someone who just got their keys?</span>
+      <button class="ghost wa" id="shareBtn" type="button">Share on WhatsApp</button>
+    </div>
+
+    <div class="frow">
+      <button class="textbtn t-mono" id="fPerksBtn" type="button">Member benefits · up to ₹76,000</button>
+      <button class="textbtn t-mono" id="demoBtn" type="button" hidden>Watch how it works</button>
+    </div>
+  </div>
+
+  <!-- ===== Member benefits ===== -->
+  <div class="why perks" id="perks" hidden>
+    <div class="why-inner">
+      <div class="why-mark t-mono">Member benefits</div>
+      <h2 class="t-title">Worth up to ₹76,000 — for booking through us.</h2>
+      <ul class="perklist">
+        <li><b>Up to ₹50,000 cashback</b><span>Once you sign with a studio through us and pay its
+          first phase. Cancelled if the project stops before 20% is paid to the studio.</span></li>
+        <li><b>A cinematic film of your finished home</b><span>Worth ₹20,000. When a studio chosen
+          through us completes your home — with a testimonial from you, if you'd like.</span></li>
+        <li><b>OneHamper at handover</b><span>Worth ₹5,000. For every home built through us.</span></li>
+        <li><b>A free cab to the studio</b><span>Worth ₹1,000. Your first trip, anywhere in
+          <span data-city>Pune</span>, once a studio meeting is booked after your call.</span></li>
+        <li><b>A 30-minute call with a registered architect</b><span><s class="was">₹5,000</s> — free
+          for the first 1,000 to join. No studio pays our architects.</span></li>
+        <li><b>10 verified studios</b><span>Every one checked before you meet them; every quote
+          comparable line by line.</span></li>
+        <li><b>₹10,000 for every friend who builds</b><span>When a friend's project with a studio
+          chosen through us has its 20% advance paid.</span></li>
+      </ul>
+      <button class="ghost" id="perksClose" type="button">Back</button>
     </div>
   </div>
 
@@ -443,8 +517,16 @@
   </div>
 </div>
 
+<!-- Analytics consent. Shown until they choose; GA sends no cookies before. -->
+<div class="cookies" id="cookies" role="region" aria-label="Analytics" hidden>
+  <span>Can we count visits with Google Analytics? No ads, no selling.
+  <a href="/privacy" target="_blank" rel="noopener">Privacy</a></span>
+  <button class="ghost small" id="ckNo" type="button">No thanks</button>
+  <button class="ghost small on" id="ckYes" type="button">Allow</button>
+</div>
+
 <script src="config.js"></script>
 <script src="stickman.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=20260930"></script>
 </body>
 </html>

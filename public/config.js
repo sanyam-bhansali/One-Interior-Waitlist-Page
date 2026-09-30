@@ -94,13 +94,22 @@ window.OI_CONFIG = {
      Keep these true. They are the first promises you make.
   ------------------------------------------------------------- */
   city: "Pune",
-  waitlistCount: 412,        // social proof; update as it grows
-  consultationMinutes: 45,   // must match what you will honour
+  consultationMinutes: 30,   // must match what you will honour
   whatsappShare: true,
 
+  /* The live numbers — members, free calls left, each person's place —
+     come from /api/stats and /api/status, never from here. There is no
+     count to set by hand any more: an invented number is the one thing
+     this page must not show. */
+
+  /* Cloudflare Turnstile site key (public). Leave empty until you have a
+     Cloudflare account; set TURNSTILE_SECRET_KEY in Vercel at the same
+     time, or every signup is refused. */
+  turnstileSiteKey: "",
+
   /* ---- Analytics ---------------------------------------------
-     Fires at waitlist_open, waitlist_step, waitlist_style,
-     waitlist_submit, waitlist_error, waitlist_share.
+     Fires at waitlist_open, waitlist_step, waitlist_submit,
+     waitlist_extras, waitlist_error, waitlist_share, link_copy, and more.
   ------------------------------------------------------------- */
   /* Every milestone on the page calls this — opening the form, each step,
      the style pick, submit, errors, the film, the skip, the share. Thirteen

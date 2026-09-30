@@ -1,8 +1,13 @@
 # One Interiors — Waitlist
 
 A cinematic waitlist landing page. The visitor opens a dark, empty room; it lights,
-materialises and furnishes itself as they answer three questions. About twenty-five
-seconds end to end.
+lights as they give a name and a WhatsApp number or email, and furnishes itself as they
+see their place in line. Pune opens when **2,000** people have joined; invites go out in
+queue order, and every friend who joins through someone's link moves them up.
+
+The rules of the gate — places per referral, the ladder, the society unlock, when the
+count appears — live in the product (`src/modules/waitlist/queue.ts`). This page only
+shows what the product answers.
 
 Static HTML, CSS and one JS file, plus a single serverless function. No framework, no
 bundler, no build step for the page itself.
@@ -21,7 +26,11 @@ bundler, no build step for the page itself.
 │       ├── og-room.jpg  link preview card
 │       └── seq/         97 render frames, scrubbed by form progress
 ├── api/
-│   └── waitlist.js      serverless form handler, keeps provider keys off the client
+│   ├── waitlist.js      signup → the product; returns their code and place
+│   ├── status.js        a returning member's place (by code)
+│   ├── extras.js        the optional "move up 20 places" answers
+│   ├── stats.js         members so far (from 100) and free calls left
+│   └── _lib.js          the shared call to the product, rate limit, Turnstile
 ├── source/              raw Higgsfield renders — never deployed, gitignored
 ├── scripts/
 │   └── build-frames.mjs regenerates public/assets/seq from source/
@@ -108,10 +117,13 @@ Get a key at [web3forms.com](https://web3forms.com), set `WEB3FORMS_KEY`.
 
 In `public/config.js`:
 
-- `consultationMinutes` — **must match what you will actually honour.** It appears four
-  times on the page and it's the first promise you make.
-- `waitlistCount` — social proof. Update as the list grows; don't inflate it.
+- `consultationMinutes` — **must match what you will actually honour** (30).
 - `city` — swap when you expand past Pune.
+
+There is no hand-set count any more. The member count comes from the product and is
+shown only from 100 ("Founding list open" below that); free calls left are shown from
+the start. The ₹5,000 struck price and "free for the first 1,000" are the owner's
+committed terms — change them in `index.html` only if the offer changes.
 
 ### 3. Set the OG image to an absolute URL
 
@@ -170,8 +182,9 @@ demoVideo: { src: "assets/demo.mp4", poster: "assets/demo-poster.jpg" },
 ```
 
 MP4, H.264 video and AAC audio, 1280×720 or 1920×1080, ideally under 8 MB. Once set, a
-"See how it works" button appears a couple of seconds after the closing message settles.
-Clicking it turns the message to dust and the player assembles out of it.
+"Watch how it works" link sits under their place in line. It no longer plays itself:
+the seconds after joining are when people share, and the stickman used to kick their
+link off the screen. Clicking it brings him on.
 
 ### Still to do
 
@@ -186,8 +199,9 @@ than cropped, into `public/assets/seq-p/`, then set `sequencePortrait` in config
 Filling the form every time you want to look at the closing screen gets old:
 
 ```
-/#finale    jumps straight to the closing message
-/#demo      jumps straight to the video panel
+/#finale        the closing screen with no member (preview mode)
+/#finale-demo   the closing screen for a made-up member — place, ladder, society
+/#demo          jumps straight to the video panel
 ```
 
 Nothing is submitted and nobody is marked as joined.
@@ -200,8 +214,13 @@ Nothing is submitted and nobody is marked as joined.
 - **Spam** — honeypot field, checked server-side
 - **Failed submissions** — the room rolls back, the error explains itself, details stay in
   the form, and the lead is written to the function logs so it's recoverable
-- **Returning visitors** — anyone who already joined sees "You're already on the list"
-- **Sharing** — native share sheet on mobile, WhatsApp on desktop
+- **Consent** — an unticked box, required on both sides, linking to `/privacy`
+- **Rate limit** — best effort per IP; Cloudflare Turnstile when its keys are set
+- **Returning visitors** — "See your place in line" fetches their current place by code
+- **Referrals** — `?r=CODE` is kept on the device until they join, then sent with the signup
+- **Sharing** — their own link, straight to WhatsApp, plus a copy button
+- **Analytics consent** — GA starts denied (Consent Mode) until they allow it
+- **Headers** — CSP (no inline scripts) and HSTS in `vercel.json`
 - **Reduced motion** — full flow works, animation collapses to near-instant
 - **Keyboard** — Enter advances, focus follows, visible focus rings
 - **Contrast** — the card deepens and the finale gets a scrim once the render brightens,
@@ -216,8 +235,12 @@ Nothing is submitted and nobody is marked as joined.
 ## Analytics
 
 `config.js` has a `track()` hook. Events: `waitlist_open`, `waitlist_step`,
-`waitlist_style`, `waitlist_submit`, `waitlist_error`, `waitlist_share`.
+`waitlist_submit`, `waitlist_extras`, `waitlist_extras_skip`, `waitlist_style`,
+`waitlist_error`, `waitlist_share`, `link_copy`, `perks_open`, `why_open`, `demo_open`,
+`waitlist_return`.
 
-The number that matters is the gap between `waitlist_open` and `waitlist_submit`. If
-people light the room and leave at step 2, the contact field is the problem — that's the
-moment the page stops being an experience and starts asking for something.
+GA runs with Consent Mode: analytics storage is denied until the visitor allows it on
+the banner (`public/ga.js`). Before that GA sends cookieless pings only.
+
+The numbers that matter: the gap between `waitlist_open` and `waitlist_submit` (is the
+form the problem?), and `waitlist_share` per `waitlist_submit` (is the ladder working?).

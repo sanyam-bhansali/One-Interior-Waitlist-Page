@@ -33,7 +33,11 @@
  * in preview mode: it validates and logs, returns success, and stores nothing.
  */
 
+import { cleanCode, hintFor, limited, readBody, turnstileOk, upstream, upstreamConfig } from './_lib.js';
+
 const STYLES = ['Warm Minimalist', 'Modern Classic', 'Industrial Loft', 'Traditional Indian'];
+/** The only city this page signs people up for. Anything else is a forged request. */
+const CITIES = ['Pune'];
 
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v);
 
@@ -64,18 +68,28 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // Ten signups from one address in ten minutes is a family at most; beyond
+  // that it is a loop.
+  if (limited(req, 'join', 10)) return res.status(429).json({ error: 'Too many attempts' });
 
-  const body = typeof req.body === 'string' ? safeParse(req.body) : (req.body || {});
-  const { name, contact, style, city, company, via } = body;
+  const body = readBody(req);
+  const { name, contact, style, city, company, via, consent, ref, turnstile } = body;
 
   // Honeypot. Bots fill hidden fields; people don't. Answer 200 so they
   // don't learn they were caught and retry with it blank.
-  if (company) return res.status(200).json({ ok: true });
+  if (company) return res.status(200).json({ ok: true, code: null, status: null });
+
+  if (!(await turnstileOk(req, turnstile))) {
+    return res.status(400).json({ error: 'Invalid submission', fields: ['turnstile'] });
+  }
 
   const errors = [];
   if (!name || String(name).trim().length < 2) errors.push('name');
   if (!contact || !(isEmail(String(contact).trim()) || isIndianPhone(contact))) errors.push('contact');
   if (style && !STYLES.includes(style)) errors.push('style');
+  if (city && !CITIES.includes(city)) errors.push('city');
+  // The product refuses a signup without it too; checking here saves a trip.
+  if (consent !== true) errors.push('consent');
   if (errors.length) return res.status(400).json({ error: 'Invalid submission', fields: errors });
 
   const lead = {
@@ -84,54 +98,45 @@ export default async function handler(req, res) {
     style: style || '',
     city: city || 'Pune',
     source: 'waitlist-landing',
+    consent: true,
+    // The friend whose link brought them, if any.
+    ref: cleanCode(ref),
     // Which society group / share link this lead came in through, if any.
     // Re-sanitised here: never trust a value that arrived from the browser.
     via: via ? String(via).toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48) : '',
     submittedAt: new Date().toISOString()
   };
 
-  /* Trimmed, and this is not a nicety. The product side trims the value it
-     reads from its own environment, so a token pasted into Vercel with a
-     trailing newline or space — which is what copying out of a terminal
-     usually gives you — arrives here a character longer than the one it is
-     compared against, fails on length, and comes back 401. Two projects
-     disagreeing about whitespace in the same secret is unfindable from the
-     outside: the endpoint simply says "Not for you." */
-  const ingestUrl = (process.env.ONE_INTERIORS_INGEST_URL || '').trim();
-  const ingestToken = (process.env.WAITLIST_INGEST_TOKEN || '').trim();
-  const hasIngest = !!(ingestUrl && ingestToken);
+  // The token is trimmed in _lib.js — see the note there.
+  const hasIngest = !!upstreamConfig();
   const hasWebhook = !!process.env.WAITLIST_WEBHOOK_URL;
   const hasWeb3 = !!process.env.WEB3FORMS_KEY;
 
   if (!hasIngest && !hasWebhook && !hasWeb3) {
     console.warn('[waitlist] No destination configured. Lead not stored:', redact(lead));
-    return res.status(200).json({ ok: true, mode: 'preview' });
+    return res.status(200).json({ ok: true, mode: 'preview', code: null, status: null });
   }
 
   // ---- 1 · store ------------------------------------------------------
+  let stored = null;
   if (hasIngest) {
     try {
-      await post(ingestUrl, lead, { Authorization: `Bearer ${ingestToken}` });
+      stored = await upstream('', { body: lead });
     } catch (err) {
-      // The visitor has already watched their room furnish itself. Don't lose
-      // the lead silently — log the whole thing so it is recoverable by hand
-      // from the Vercel function logs.
+      // The visitor has already watched their room light up. Don't lose the
+      // lead silently — log the whole thing so it is recoverable by hand
+      // from the Vercel function logs, with what to check. The response
+      // carries no hint any more: which of token, URL or table is wrong is
+      // for whoever reads the log, not for anyone holding curl.
       console.error('[waitlist] Ingest failed. Lead was:',
-        JSON.stringify(redact(lead)), String(err));
-      /* The upstream status goes in the response. It is not sensitive — a
-         number, no body — and without it the only way to tell a token
-         mismatch (401) from a missing table (500) from a wrong URL (404) is
-         to go and read the function log, which is a poor way to spend the
-         ten minutes after launching. The page shows its own wording; this is
-         for whoever is holding curl. */
-      return res.status(502).json({
-        error: 'Could not reach the waitlist store',
-        upstream: err && err.status ? err.status : null,
-        hint: err && err.status === 401 ? 'token mismatch, or the product was not redeployed after setting it'
-            : err && err.status === 404 ? 'wrong ONE_INTERIORS_INGEST_URL'
-            : err && err.status === 500 ? 'product reached, but it could not store — table missing? run npm run db:deploy'
-            : 'could not reach the product at all'
-      });
+        JSON.stringify(redact(lead)), String(err), '->', hintFor(err && err.status));
+      if (err && err.status === 400) {
+        return res.status(400).json({
+          error: 'Invalid submission',
+          fields: (err.body && err.body.fields) || []
+        });
+      }
+      return res.status(502).json({ error: 'Could not reach the waitlist store' });
     }
   }
 
@@ -158,7 +163,12 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ ok: true });
+  // Their code, place and unlocks, for the confirmation screen.
+  return res.status(200).json({
+    ok: true,
+    code: (stored && stored.code) || null,
+    status: (stored && stored.status) || null
+  });
 }
 
 async function post(url, payload, extraHeaders = {}) {
@@ -189,8 +199,4 @@ async function post(url, payload, extraHeaders = {}) {
 function redact(lead) {
   const c = String(lead.contact || '');
   return { ...lead, contact: `${c.slice(0, 3)}…${c.slice(-2)}` };
-}
-
-function safeParse(s) {
-  try { return JSON.parse(s); } catch { return {}; }
 }
