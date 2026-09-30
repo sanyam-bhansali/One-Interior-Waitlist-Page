@@ -645,6 +645,8 @@
         remember();
         clearRef();
         CFG.track('waitlist_submit', { referred: !!readRef(), created: !!(json && json.created) });
+        // A person joining again is not a new lead; the server skips them too.
+        if (window.OI_META && eventId && !(json && json.created === false)) window.OI_META.lead(eventId);
         setStage(4);
         // Someone joining again who already answered goes straight to their place.
         if (me.status && me.status.answered) return toFinale();
@@ -869,8 +871,14 @@
     } catch (e) { return null; }
   }
 
+  var eventId = '';
   function buildPayload() {
+    // One id per attempt, shared by the browser pixel and the server's
+    // Conversions API call so Meta counts the lead once.
+    eventId = window.OI_META ? window.OI_META.newEventId() : '';
     return {
+      eventId: eventId || undefined,
+      adConsent: !!(window.OI_META && window.OI_META.consented()),
       name: lead.name, contact: lead.contact,
       city: CFG.city, source: 'waitlist-landing',
       consent: true,

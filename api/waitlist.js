@@ -33,7 +33,7 @@
  * in preview mode: it validates and logs, returns success, and stores nothing.
  */
 
-import { cleanCode, hintFor, limited, readBody, turnstileOk, upstream, upstreamConfig } from './_lib.js';
+import { cleanCode, hintFor, limited, readBody, sendMetaLead, turnstileOk, upstream, upstreamConfig } from './_lib.js';
 
 const STYLES = ['Warm Minimalist', 'Modern Classic', 'Industrial Loft', 'Traditional Indian'];
 /** The only city this page signs people up for. Anything else is a forged request. */
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
   if (limited(req, 'join', 10)) return res.status(429).json({ error: 'Too many attempts' });
 
   const body = readBody(req);
-  const { name, contact, style, city, company, via, consent, ref, turnstile } = body;
+  const { name, contact, style, city, company, via, consent, ref, turnstile, eventId, adConsent } = body;
 
   // Honeypot. Bots fill hidden fields; people don't. Answer 200 so they
   // don't learn they were caught and retry with it blank.
@@ -161,6 +161,15 @@ export default async function handler(req, res) {
       // Already stored. A dead webhook is an ops problem, not the visitor's.
       console.error('[waitlist] Stored, but notification failed:', String(err));
     }
+  }
+
+  // ---- 3 · measure (Meta Conversions API) ------------------------------
+  // Only with the banner's "Allow", and only for a new signup — someone
+  // joining again is not a new lead. Awaited (Vercel stops the function when
+  // it responds) but capped at four seconds and never fails the signup.
+  const isNew = stored ? stored.created !== false : true;
+  if (adConsent === true && isNew && typeof eventId === 'string') {
+    await sendMetaLead(req, { contact: lead.contact, name: lead.name, eventId, city: lead.city });
   }
 
   // Their code, place and unlocks, for the confirmation screen.

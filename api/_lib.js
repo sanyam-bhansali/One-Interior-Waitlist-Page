@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * Shared by the functions in api/. The leading underscore keeps Vercel from
  * deploying this file as a route of its own.
@@ -129,4 +131,92 @@ export function cleanCode(v) {
 
 export function safeParse(s) {
   try { return JSON.parse(s); } catch { return null; }
+}
+
+/* ---- Meta Conversions API ------------------------------------------------
+ * The server's half of the Lead event (the browser's half is public/meta.js).
+ * Sent only when META_PIXEL_ID and META_CAPI_TOKEN are set AND the visitor
+ * allowed analytics on the banner — signing up is consent to be contacted,
+ * not to be measured for ads, and the two are kept apart.
+ *
+ * Phone and email are hashed (SHA-256, normalised as Meta asks) before they
+ * leave this function; Meta never receives them in the clear. Best effort:
+ * never throws, never delays the visitor by more than the timeout.
+ */
+const sha = (v) => createHash('sha256').update(v).digest('hex');
+
+function cookie(req, name) {
+  const m = String(req.headers.cookie || '').match(new RegExp('(?:^|;\s*)' + name + '=([^;]+)'));
+  return m ? decodeURIComponent(m[1]) : undefined;
+}
+
+/** Indian mobile to Meta's form: country code, digits only (919876543210). */
+function metaPhone(contact) {
+  const d = String(contact || '').replace(/\D/g, '');
+  const ten = d.length === 10 ? d
+    : d.length === 11 && d.startsWith('0') ? d.slice(1)
+    : d.length === 12 && d.startsWith('91') ? d.slice(2)
+    : d.length === 13 && d.startsWith('091') ? d.slice(3)
+    : null;
+  return ten && /^[6-9]/.test(ten) ? '91' + ten : null;
+}
+
+export async function sendMetaLead(req, { contact, name, eventId, city }) {
+  const pixel = (process.env.META_PIXEL_ID || '').replace(/\D/g, '');
+  const token = (process.env.META_CAPI_TOKEN || '').trim();
+  if (!pixel || !token || !eventId) return { sent: false, reason: 'not configured' };
+
+  const c = String(contact || '').trim();
+  const email = /@/.test(c) ? c.toLowerCase() : null;
+  const phone = email ? null : metaPhone(c);
+  const first = String(name || '').trim().split(/\s+/)[0].toLowerCase().replace(/[^a-zऀ-ॿ]/g, '');
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || undefined;
+
+  const user_data = {
+    ...(phone ? { ph: [sha(phone)] } : {}),
+    ...(email ? { em: [sha(email)] } : {}),
+    ...(first ? { fn: [sha(first)] } : {}),
+    ct: [sha(String(city || 'pune').toLowerCase().replace(/[^a-z]/g, ''))],
+    country: [sha('in')],
+    client_ip_address: ip,
+    client_user_agent: String(req.headers['user-agent'] || '') || undefined,
+    fbp: cookie(req, '_fbp'),
+    fbc: cookie(req, '_fbc'),
+  };
+
+  const body = {
+    data: [{
+      event_name: 'Lead',
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: String(eventId).slice(0, 100),
+      action_source: 'website',
+      event_source_url: String(req.headers.referer || 'https://oneinteriors.in/'),
+      user_data,
+      custom_data: { content_name: 'pune_waitlist' },
+    }],
+    ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE.trim() } : {}),
+  };
+
+  const version = (process.env.META_GRAPH_VERSION || 'v22.0').trim();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(`https://graph.facebook.com/${version}/${pixel}/events?access_token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      // The body names the problem (bad token, bad pixel) and holds no personal data.
+      console.error('[meta] CAPI refused:', r.status, (await r.text().catch(() => '')).slice(0, 300));
+      return { sent: false, reason: 'refused' };
+    }
+    return { sent: true };
+  } catch (err) {
+    console.error('[meta] CAPI unreachable:', String(err));
+    return { sent: false, reason: 'unreachable' };
+  } finally {
+    clearTimeout(timer);
+  }
 }

@@ -43,6 +43,8 @@ function gtag(){ dataLayer.push(arguments); }
       try { localStorage.setItem('oi_analytics', yes ? 'yes' : 'no'); } catch (e) {}
       gtag('consent', 'update', { analytics_storage: yes ? 'granted' : 'denied' });
       this.choice = yes ? 'yes' : 'no';
+      // The same "Allow" covers the Meta pixel (meta.js), which says so on the banner.
+      if (yes && window.OI_META) window.OI_META.start();
     }
   };
 })();

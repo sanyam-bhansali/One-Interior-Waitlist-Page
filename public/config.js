@@ -107,6 +107,12 @@ window.OI_CONFIG = {
      time, or every signup is refused. */
   turnstileSiteKey: "",
 
+  /* Meta pixel ID (public — it is in every page that uses it). Events
+     Manager → Data sources → your pixel. Nothing loads until it is set AND
+     the visitor taps "Allow". The server half (Conversions API) needs
+     META_PIXEL_ID and META_CAPI_TOKEN in Vercel — see docs/META-SETUP.md. */
+  metaPixelId: "",
+
   /* ---- Analytics ---------------------------------------------
      Fires at waitlist_open, waitlist_step, waitlist_submit,
      waitlist_extras, waitlist_error, waitlist_share, link_copy, and more.
