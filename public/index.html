@@ -308,9 +308,12 @@
     <form class="card" id="waitlistForm" novalidate>
       <div class="prog" aria-hidden="true"><i id="p1" class="on"></i><i id="p2"></i><i id="p3"></i></div>
 
+      <!-- Bot trap. Named so no browser autofills it: it used to be "company",
+           and Chrome's address autofill filled it from people's saved profiles,
+           which made the page silently drop real signups. -->
       <div class="hp" aria-hidden="true">
-        <label for="company">Company</label>
-        <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        <label for="oiTrap">Leave this empty</label>
+        <input type="text" id="oiTrap" name="oi_trap_x7" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore>
       </div>
 
       <!-- Step 1 -->
@@ -522,6 +525,6 @@
 <script src="config.js"></script>
 <script src="meta.js?v=20261001"></script>
 <script src="stickman.js"></script>
-<script src="app.js?v=20261001"></script>
+<script src="app.js?v=20261001b"></script>
 </body>
 </html>

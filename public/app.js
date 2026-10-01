@@ -629,7 +629,13 @@
     if (!document.getElementById('s1').hidden) { step1(); return; }
     if (document.getElementById('s2').hidden) return;
     if (submitBtn.disabled) return;
-    if (document.getElementById('company').value) return;   // honeypot
+    // The bot trap. A person never sees it; if it holds anything, say so in
+    // analytics rather than vanish without a word — a silent return here once
+    // swallowed real signups when Chrome autofilled the old "company" field.
+    if (document.getElementById('oiTrap').value) {
+      CFG.track('waitlist_trap', {});
+      return;
+    }
     if (!step2Valid()) return;
 
     submitBtn.disabled = true;
