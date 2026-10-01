@@ -869,7 +869,12 @@
   function referrerTag() {
     try {
       var q = new URLSearchParams(window.location.search);
-      var v = q.get('s') || q.get('src') || q.get('utm_source') || '';
+      // A society or QR tag wins. For an ad, keep WHICH ad as well as which
+      // platform — "meta" alone tells /ops/waitlist nothing about what worked.
+      var ad = q.get('utm_source')
+        ? q.get('utm_source') + (q.get('utm_content') ? '_' + q.get('utm_content') : '')
+        : '';
+      var v = q.get('s') || q.get('src') || ad || '';
       // whitelist, not blacklist: this string ends up in someone's inbox
       v = String(v).trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 48);
       if (!v && readRef()) v = 'referral';
