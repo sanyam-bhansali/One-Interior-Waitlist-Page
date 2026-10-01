@@ -111,7 +111,7 @@ window.OI_CONFIG = {
      Manager → Data sources → your pixel. Nothing loads until it is set AND
      the visitor taps "Allow". The server half (Conversions API) needs
      META_PIXEL_ID and META_CAPI_TOKEN in Vercel — see docs/META-SETUP.md. */
-  metaPixelId: "",
+  metaPixelId: "1669962868129035",
 
   /* ---- Analytics ---------------------------------------------
      Fires at waitlist_open, waitlist_step, waitlist_submit,
