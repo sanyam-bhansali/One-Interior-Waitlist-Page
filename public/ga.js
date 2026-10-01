@@ -1,22 +1,17 @@
-/* Google Analytics (GA4), with Consent Mode.
-   Loaded before gtag.js. Analytics storage starts DENIED: until the visitor
-   says yes on the small banner, GA sets no cookies and sends only cookieless
-   pings. The choice is remembered on this device (oi_analytics = yes | no).
+/* Google Analytics (GA4).
+   No banner (the owner, 1 Oct 2026): visits are measured for everyone and
+   /privacy says so. Ad storage stays denied — GA is for counting, not ads.
    Its own file, not an inline script, so the Content-Security-Policy can
    forbid inline scripts outright. */
 window.dataLayer = window.dataLayer || [];
 function gtag(){ dataLayer.push(arguments); }
 
 (function () {
-  var choice = null;
-  try { choice = localStorage.getItem('oi_analytics'); } catch (e) {}
-
   gtag('consent', 'default', {
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
-    analytics_storage: choice === 'yes' ? 'granted' : 'denied',
-    wait_for_update: 500
+    analytics_storage: 'granted'
   });
   gtag('js', new Date());
 
@@ -37,14 +32,4 @@ function gtag(){ dataLayer.push(arguments); }
   gtag('config', 'G-Y451K5CT0R', via ? { via: via } : {});
   if (via) gtag('set', 'user_properties', { via: via });
 
-  window.OI_ANALYTICS = {
-    choice: choice,
-    set: function (yes) {
-      try { localStorage.setItem('oi_analytics', yes ? 'yes' : 'no'); } catch (e) {}
-      gtag('consent', 'update', { analytics_storage: yes ? 'granted' : 'denied' });
-      this.choice = yes ? 'yes' : 'no';
-      // The same "Allow" covers the Meta pixel (meta.js), which says so on the banner.
-      if (yes && window.OI_META) window.OI_META.start();
-    }
-  };
 })();

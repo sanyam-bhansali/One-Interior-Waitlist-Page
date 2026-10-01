@@ -878,7 +878,8 @@
     eventId = window.OI_META ? window.OI_META.newEventId() : '';
     return {
       eventId: eventId || undefined,
-      adConsent: !!(window.OI_META && window.OI_META.consented()),
+      // The consent box names ad measurement, and the form refuses without it.
+      adConsent: consentBox.checked,
       name: lead.name, contact: lead.contact,
       city: CFG.city, source: 'waitlist-landing',
       consent: true,
@@ -1258,30 +1259,6 @@
     close.addEventListener('click', hide);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && open) hide();
-    });
-  })();
-
-  /* ============================================================
-     ANALYTICS CONSENT
-     GA starts with analytics storage denied (ga.js). This asks once.
-     ============================================================ */
-  (function () {
-    var bar = document.getElementById('cookies');
-    if (!bar || !window.OI_ANALYTICS || window.OI_ANALYTICS.choice) return;
-    // A beat late, so it never sits on top of the opening line.
-    setTimeout(function () { bar.hidden = false; }, 2500);
-    function choose(yes) {
-      window.OI_ANALYTICS.set(yes);
-      bar.hidden = true;
-    }
-    document.getElementById('ckYes').addEventListener('click', function () { choose(true); });
-    document.getElementById('ckNo').addEventListener('click', function () { choose(false); });
-    /* On a phone it would sit on the form's buttons. Once they start
-       joining it stands down unanswered — analytics stays off — and asks
-       again next visit. */
-    joinBtn.addEventListener('click', function () { bar.hidden = true; });
-    each(document.querySelectorAll('#whyBtn, #perksBtn'), function (b) {
-      b.addEventListener('click', function () { bar.hidden = true; });
     });
   })();
 

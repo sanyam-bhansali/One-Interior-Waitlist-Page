@@ -219,7 +219,8 @@ Nothing is submitted and nobody is marked as joined.
 - **Returning visitors** — "See your place in line" fetches their current place by code
 - **Referrals** — `?r=CODE` is kept on the device until they join, then sent with the signup
 - **Sharing** — their own link, straight to WhatsApp, plus a copy button
-- **Analytics consent** — GA starts denied (Consent Mode) until they allow it
+- **Measurement** — GA and the Meta pixel for every visitor, said on `/privacy`; the
+  signup's consent box covers the server-side Meta Lead (hashed contact)
 - **Headers** — CSP (no inline scripts) and HSTS in `vercel.json`
 - **Reduced motion** — full flow works, animation collapses to near-instant
 - **Keyboard** — Enter advances, focus follows, visible focus rings
@@ -239,8 +240,8 @@ Nothing is submitted and nobody is marked as joined.
 `waitlist_error`, `waitlist_share`, `link_copy`, `perks_open`, `why_open`, `demo_open`,
 `waitlist_return`.
 
-GA runs with Consent Mode: analytics storage is denied until the visitor allows it on
-the banner (`public/ga.js`). Before that GA sends cookieless pings only.
+GA and the Meta pixel run for every visitor (no banner, the owner's call of 1 Oct 2026);
+`/privacy` says so. Setup and testing: `docs/META-SETUP.md`.
 
 The numbers that matter: the gap between `waitlist_open` and `waitlist_submit` (is the
 form the problem?), and `waitlist_share` per `waitlist_submit` (is the ladder working?).

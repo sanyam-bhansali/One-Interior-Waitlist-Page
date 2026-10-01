@@ -1,17 +1,16 @@
-/* Meta pixel — only with consent, only when configured.
+/* Meta pixel — loads whenever config.js has a `metaPixelId`.
 
-   Nothing here loads until BOTH are true:
-     1. config.js has a `metaPixelId`, and
-     2. the visitor tapped "Allow" on the banner (oi_analytics = yes).
-   Before that, window.OI_META.lead() is a no-op, so a signup never waits on
-   Meta and an ad blocker can never break the form.
+   No banner (the owner, 1 Oct 2026): page visits are measured for everyone,
+   and /privacy says so. The signup's own consent box covers the one thing
+   that carries personal data — the server's hashed copy of the Lead (see
+   api/_lib.js) — so that is sent only for people who ticked it.
 
    The Lead event carries an event_id. /api/waitlist sends the same id to the
-   Conversions API from the server, so Meta counts one lead, not two, when
-   both arrive — and still counts it when the browser's copy is blocked.
+   Conversions API from the server, so Meta counts one lead, not two, and
+   still counts it when an ad blocker ate the browser's copy.
 
    Its own file, not the usual inline snippet, so the Content-Security-Policy
-   can keep forbidding inline scripts. */
+   can keep forbidding inline scripts. A failure here never touches the form. */
 (function () {
   'use strict';
   var started = false;
@@ -21,12 +20,8 @@
     return c.metaPixelId ? String(c.metaPixelId).replace(/\D/g, '') : '';
   }
 
-  function consented() {
-    return !!(window.OI_ANALYTICS && window.OI_ANALYTICS.choice === 'yes');
-  }
-
   function start() {
-    if (started || !pixelId() || !consented()) return false;
+    if (started || !pixelId()) return false;
     started = true;
     /* Meta's standard loader, unrolled. */
     var n = window.fbq = function () {
@@ -49,12 +44,8 @@
   }
 
   window.OI_META = {
-    /** Called by ga.js when the visitor allows analytics. */
-    start: start,
     /** An id for this signup, shared by the browser and the server events. */
     newEventId: newEventId,
-    /** Whether the server may send this signup to the Conversions API. */
-    consented: consented,
     /** The browser's half of the Lead event. */
     lead: function (eventId) {
       try {

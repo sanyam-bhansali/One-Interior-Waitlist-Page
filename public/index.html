@@ -346,7 +346,8 @@
         <label class="consent" for="inConsent">
           <input type="checkbox" id="inConsent" name="consent">
           <span>Message me on WhatsApp or email about One Interiors — my place, my
-          invite and my call. <a href="/privacy" target="_blank" rel="noopener">Privacy</a></span>
+          invite and my call. We measure our ads with Meta and Google.
+          <a href="/privacy" target="_blank" rel="noopener">Privacy</a></span>
         </label>
         <span class="err" id="errConsent" role="alert"></span>
         <!-- Cloudflare Turnstile renders here when config.js has a site key. -->
@@ -517,18 +518,10 @@
   </div>
 </div>
 
-<!-- Analytics consent. Shown until they choose; GA sends no cookies before. -->
-<div class="cookies" id="cookies" role="region" aria-label="Analytics" hidden>
-  <span>Can we count visits with Google Analytics and Meta? It tells us which of our ads
-  work. We never sell your details.
-  <a href="/privacy" target="_blank" rel="noopener">Privacy</a></span>
-  <button class="ghost small" id="ckNo" type="button">No thanks</button>
-  <button class="ghost small on" id="ckYes" type="button">Allow</button>
-</div>
 
 <script src="config.js"></script>
-<script src="meta.js?v=20260930"></script>
+<script src="meta.js?v=20261001"></script>
 <script src="stickman.js"></script>
-<script src="app.js?v=20260930b"></script>
+<script src="app.js?v=20261001"></script>
 </body>
 </html>

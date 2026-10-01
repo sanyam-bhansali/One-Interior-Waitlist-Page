@@ -5,23 +5,19 @@ spending. Plan and budget: `LAUNCH-KIT.md` §2 and the 15-day plan.
 
 ## What the page does
 
-- **Consent first.** Nothing from Meta loads until the visitor taps **Allow** on
-  the banner. "No thanks", or never answering, means no pixel, no cookies, and no
-  server event. The banner and `/privacy` say so.
+- **No banner** (the owner, 1 Oct 2026). The pixel and Google Analytics run for
+  every visitor; `/privacy` says so.
 - **Browser event** (`public/meta.js`): `PageView`, then `Lead` on a real, new
   signup, with an `eventID`.
 - **Server event** (`api/waitlist.js` → `sendMetaLead` in `api/_lib.js`): the same
   `Lead` with the same `event_id`, so Meta counts one lead, not two, and still
-  counts it when an ad blocker ate the browser's copy. Phone (as `91XXXXXXXXXX`),
+  counts it when an ad blocker ate the browser's copy. It carries personal data
+  (hashed), so it is sent only with the signup's consent box ticked, and that box
+  names ad measurement. Phone (as `91XXXXXXXXXX`),
   email and first name are SHA-256 hashed before they leave the server. Best
   effort, 4-second cap; it never fails a signup.
 - A person joining again (same number) is not sent as a new lead.
 
-**Trade-off to know:** only visitors who tap Allow are measured. The banner stands
-down when someone starts joining (so it never covers the form on a phone), so
-many signups will be unmeasured. Meta optimises on the leads it can see; if too
-few arrive (under ~50 a week per ad set), optimise for landing page views
-instead and judge ads by `utm_content` in `/ops/waitlist` and GA.
 
 ## You do, in Meta (about 30 minutes)
 
@@ -53,7 +49,7 @@ Commit `config.js`, push, and redeploy (env changes need a redeploy).
 1. Events Manager → Test events → copy the test code into `META_TEST_EVENT_CODE`,
    redeploy.
 2. Open `https://oneinteriors.in/?utm_source=meta&utm_content=test` in a private
-   window, tap **Allow**, join with a real number of yours.
+   window and join with a real number of yours.
 3. Test events should show **PageView** (browser), **Lead** (browser) and **Lead**
    (server), the two Leads marked *deduplicated*.
 4. Remove `META_TEST_EVENT_CODE`, redeploy, and delete the test signup at
