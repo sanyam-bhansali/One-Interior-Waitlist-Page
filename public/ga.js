@@ -29,7 +29,10 @@ function gtag(){ dataLayer.push(arguments); }
     if (!via && q.get('r')) via = 'referral';
   } catch (e) {}
 
+  // Two GA4 properties: the original, and the one added on 1 Oct 2026.
+  // Drop the first line here once the new property has been checked.
   gtag('config', 'G-Y451K5CT0R', via ? { via: via } : {});
+  gtag('config', 'G-Z3EDL5R61Y', via ? { via: via } : {});
   if (via) gtag('set', 'user_properties', { via: via });
 
 })();
